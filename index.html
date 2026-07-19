@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
@@ -55,11 +55,11 @@
   <div class="toolbar">
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="search-input" type="text" placeholder="搜尋名稱、英文名稱、類型、語言版本或系列…" />
+      <input id="search-input" type="text" placeholder="搜尋名稱、別名、類型、語言版本或系列…" />
     </div>
     <select id="sort-select" class="sort-select">
       <option value="newest">上傳時間（新到舊）</option>
-      <option value="name">依中文名稱排序</option>
+      <option value="name">依名稱排序（A→Z）</option>
     </select>
     <div class="filter-dropdown">
       <button class="btn-filter" id="filter-toggle-btn">
@@ -173,12 +173,12 @@
         </div>
       </div>
       <div class="field">
-        <label>名稱</label>
-        <input type="text" id="f-name" required placeholder="例如：卡卡頌">
+        <label>名稱（不限語言，中文、英文、日文等皆可作為主要名稱）</label>
+        <input type="text" id="f-name" required placeholder="例如：卡卡頌、Carcassonne、カタン">
       </div>
       <div class="field">
-        <label>英文名稱（選填）</label>
-        <input type="text" id="f-name-en" placeholder="例如：Carcassonne">
+        <label>別名／其他語言名稱（選填）</label>
+        <input type="text" id="f-name-en" placeholder="例如：Carcassonne、カタン、カルカソンヌ">
       </div>
       <div class="field">
         <label>類型（以逗號分隔）</label>
@@ -273,6 +273,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>

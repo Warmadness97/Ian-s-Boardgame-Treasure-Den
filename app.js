@@ -111,7 +111,7 @@ function isNewGame(g){
 function applySort(list, mode){
   const sorted = [...list];
   if(mode === 'name'){
-    sorted.sort((a,b)=> (a.name||'').localeCompare((b.name||''), 'zh-Hant'));
+    sorted.sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
   } else {
     sorted.sort((a,b)=> ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0));
   }
@@ -753,7 +753,7 @@ function csvEscape(val){
 downloadBtn.addEventListener('click', ()=>{
   listPanel.classList.remove('show');
   if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
-  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','發行年份','難度(1-5)','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const headers = ['名稱','別名','類型','所屬主遊戲','系列','發行年份','難度(1-5)','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
   const rows = games.map(g => [
     g.name,
     g.nameEn || '',
@@ -828,7 +828,7 @@ importFileInput.addEventListener('change', async (e)=>{
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
   // 依下載清單的欄位順序解析：
-  // 名稱,英文名稱,類型,所屬主遊戲,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 名稱,別名,類型,所屬主遊戲,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
