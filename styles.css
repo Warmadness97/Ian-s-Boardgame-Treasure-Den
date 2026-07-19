@@ -211,10 +211,18 @@ body.is-logged-in .user-chip{display:flex;}
 .card-img{
   width:100%;aspect-ratio:4/3;background:var(--surface-2);
   display:flex;align-items:center;justify-content:center;overflow:hidden;
-  border-bottom:1px solid var(--line);
+  border-bottom:1px solid var(--line);position:relative;
 }
 .card-img img{width:100%;height:100%;object-fit:cover;}
 .card-img .placeholder{color:var(--ink-soft);font-size:12px;font-family:'IBM Plex Mono',monospace;text-align:center;padding:10px;}
+.card-img-badges{
+  position:absolute;top:8px;right:8px;z-index:2;
+  display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;
+}
+.card-img-badges span{
+  background:rgba(255,252,244,0.94);box-shadow:0 1px 5px rgba(0,0,0,0.3);
+  text-align:right;
+}
 .card-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
 .card-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;line-height:1.25;}
 .card-name-en{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin-top:-4px;}
@@ -357,6 +365,20 @@ body.is-logged-in .user-chip{display:flex;}
 .detail-body{padding:22px 26px 26px;}
 .detail-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:24px;margin-bottom:2px;}
 .detail-name-en{font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;}
+
+.detail-meta{margin:12px 0;display:flex;flex-direction:column;gap:9px;}
+.detail-meta-row{display:flex;gap:12px;align-items:flex-start;}
+.detail-meta-label{
+  flex:0 0 90px;font-size:11.5px;font-weight:700;color:var(--ink-soft);
+  font-family:'IBM Plex Mono',monospace;padding-top:4px;
+}
+.detail-meta-value{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;}
+.detail-meta-note{font-size:12.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+.tag-base{
+  background:rgba(34,48,60,0.08);color:var(--ink);
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;font-family:'IBM Plex Mono',monospace;
+}
+
 .detail-desc{font-size:14.5px;line-height:1.7;color:var(--ink);white-space:pre-wrap;margin:14px 0;}
 .detail-link{
   display:inline-block;margin-top:6px;color:var(--accent-lang);font-weight:600;font-size:13.5px;

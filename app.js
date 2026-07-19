@@ -63,8 +63,7 @@ const detailOverlay = document.getElementById('detail-overlay');
 const detailClose = document.getElementById('detail-close');
 const detailImg = document.getElementById('detail-img');
 const detailName = document.getElementById('detail-name');
-const detailTags = document.getElementById('detail-tags');
-const detailBaseGame = document.getElementById('detail-basegame');
+const detailMeta = document.getElementById('detail-meta');
 const detailStats = document.getElementById('detail-stats');
 const detailDesc = document.getElementById('detail-desc');
 const detailLink = document.getElementById('detail-link');
@@ -289,14 +288,16 @@ function renderCard(g){
   const imgHtml = g.image
     ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
+  const cornerBadges = (expansionTag || seriesTag || langTags)
+    ? `<div class="card-img-badges">${expansionTag}${seriesTag}${langTags}</div>` : '';
   return `
   <div class="card" data-id="${g.id}">
-    <div class="card-img">${imgHtml}</div>
+    <div class="card-img">${imgHtml}${cornerBadges}</div>
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
       ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
       ${g.difficulty ? `<div class="difficulty-stars">${renderStars(g.difficulty)}</div>` : ''}
-      <div class="tags">${expansionTag}${seriesTag}${genreTags}${langTags}</div>
+      ${genreTags ? `<div class="tags">${genreTags}</div>` : ''}
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
       <div class="stats-row">
@@ -530,13 +531,34 @@ form.addEventListener('submit', async (e)=>{
   saveBtn.disabled=false; saveBtn.textContent='儲存';
 });
 
+function metaRow(label, valueHtml){
+  return `<div class="detail-meta-row"><div class="detail-meta-label">${label}</div><div class="detail-meta-value">${valueHtml}</div></div>`;
+}
+
+function buildDetailMeta(g){
+  let rows = '';
+  const typeBadge = g.gameType === 'expansion'
+    ? `<span class="tag-expansion">擴充</span>`
+    : `<span class="tag-base">主遊戲</span>`;
+  const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
+    ? `<span class="detail-meta-note">擴充自「${escapeHtml(g.baseGameName)}」</span>` : '';
+  rows += metaRow('主遊戲／擴充', typeBadge + baseGameNote);
+
+  if(g.series){
+    rows += metaRow('系列', `<span class="tag-series">${escapeHtml(g.series)}</span>`);
+  }
+  if((g.genres||[]).length){
+    rows += metaRow('類型', g.genres.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join(''));
+  }
+  if((g.languages||[]).length){
+    rows += metaRow('語言版本', g.languages.map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join(''));
+  }
+  return rows;
+}
+
 function openDetailModal(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
-  const genreTags = (g.genres||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
-  const langTags = (g.languages||[]).map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join('');
-  const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
-  const seriesTag = g.series ? `<span class="tag-series">${escapeHtml(g.series)} 系列</span>` : '';
 
   detailImg.innerHTML = g.image
     ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
@@ -544,8 +566,7 @@ function openDetailModal(g){
   detailName.textContent = g.name;
   detailNameEn.textContent = g.nameEn || '';
   detailDifficulty.innerHTML = g.difficulty ? renderStars(g.difficulty) : '';
-  detailTags.innerHTML = expansionTag + seriesTag + genreTags + langTags;
-  detailBaseGame.textContent = (g.gameType === 'expansion' && g.baseGameName) ? `→ 擴充自「${g.baseGameName}」` : '';
+  detailMeta.innerHTML = buildDetailMeta(g);
   detailStats.innerHTML = `${g.year ? `<div class="stat">${CALENDAR_ICON}${g.year}</div>` : ''}<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
   detailDesc.textContent = g.desc || '（尚未填寫簡介）';
   if(g.url){
