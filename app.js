@@ -1,4 +1,4 @@
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig, OWNER_EMAIL } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getFirestore, collection, doc, onSnapshot,
@@ -16,6 +16,7 @@ const gamesCol = collection(db, 'games');
 const siteMetaRef = doc(db, 'meta', 'site');
 
 let currentUser = null;
+let isOwner = false;
 
 const DICE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="16" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="16" r="1.4" fill="currentColor"/><circle cx="16" cy="16" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>';
 const HOURGLASS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12M6 22h12M6 2c0 5 5 6 6 8-1 2-6 3-6 8M18 2c0 5-5 6-6 8 1 2 6 3 6 8"/></svg>';
@@ -57,8 +58,10 @@ function escapeHtml(str){
 /* ---------- Auth ---------- */
 onAuthStateChanged(auth, (user)=>{
   currentUser = user;
+  isOwner = !!(user && user.email === OWNER_EMAIL);
   document.body.classList.toggle('is-logged-in', !!user);
-  titleInput.readOnly = !user;
+  document.body.classList.toggle('is-owner', isOwner);
+  titleInput.readOnly = !isOwner;
   if(user){
     userAvatar.src = user.photoURL || '';
     userName.textContent = user.displayName || user.email || '已登入';
@@ -141,7 +144,7 @@ function renderCard(g){
         <div class="stat">${DICE_ICON}${players}</div>
         <div class="stat">${HOURGLASS_ICON}${time}</div>
       </div>
-      ${currentUser ? `
+      ${isOwner ? `
       <div class="card-actions">
         <button class="edit-btn" data-action="edit" data-id="${g.id}">${EDIT_ICON} 編輯</button>
         <button class="del-btn" data-action="delete" data-id="${g.id}">${TRASH_ICON} 刪除</button>
@@ -222,7 +225,7 @@ function closeModal(){
 }
 
 document.getElementById('open-add-btn').addEventListener('click', ()=>{
-  if(!currentUser){ showToast('請先登入才能新增桌遊'); return; }
+  if(!isOwner){ showToast('只有管理者可以新增桌遊'); return; }
   openModal('add');
 });
 document.getElementById('cancel-btn').addEventListener('click', closeModal);
@@ -256,7 +259,7 @@ imgInput.addEventListener('change', (e)=> handleImageFile(e.target.files[0]));
 /* form submit */
 form.addEventListener('submit', async (e)=>{
   e.preventDefault();
-  if(!currentUser){ showToast('請先登入才能儲存變更'); return; }
+  if(!isOwner){ showToast('只有管理者可以儲存變更'); return; }
   const saveBtn = document.getElementById('save-btn');
   saveBtn.disabled = true; saveBtn.textContent = '儲存中…';
 
@@ -303,7 +306,7 @@ grid.addEventListener('click', async (e)=>{
   const action = btn.dataset.action;
   const g = games.find(x=>x.id===id);
   if(!g) return;
-  if(!currentUser){ showToast('請先登入才能編輯或刪除'); return; }
+  if(!isOwner){ showToast('只有管理者可以編輯或刪除'); return; }
   if(action === 'edit'){
     openModal('edit', g);
   } else if(action === 'delete'){
@@ -325,13 +328,13 @@ langFilterSelect.addEventListener('change', renderGrid);
 
 /* title editing */
 titleInput.addEventListener('blur', ()=>{
-  if(!currentUser) return;
+  if(!isOwner) return;
   const val = titleInput.value.trim() || '桌遊資料庫';
   titleInput.value = val;
   saveTitle(val);
 });
 titleInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); titleInput.blur(); } });
 document.getElementById('title-pencil').addEventListener('click', ()=>{
-  if(!currentUser){ showToast('請先登入才能修改標題'); return; }
+  if(!isOwner){ showToast('只有管理者可以修改標題'); return; }
   titleInput.focus();
 });
