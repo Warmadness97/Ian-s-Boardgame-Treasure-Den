@@ -161,6 +161,11 @@ function refreshSubtitleVisibility(){
   box.style.display = (customSubtitleInput.value.trim() || isOwner) ? 'flex' : 'none';
 }
 
+function autoGrowTextarea(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
 onSnapshot(siteMetaRef, (snap)=>{
   if(snap.exists() && !titleSyncing){
     const data = snap.data();
@@ -169,6 +174,7 @@ onSnapshot(siteMetaRef, (snap)=>{
     }
     if(document.activeElement !== customSubtitleInput){
       customSubtitleInput.value = data.subtitle || '';
+      autoGrowTextarea(customSubtitleInput);
     }
     if(data.headerImage){
       bannerImg.src = data.headerImage;
@@ -622,14 +628,15 @@ document.getElementById('title-pencil').addEventListener('click', ()=>{
 });
 
 /* subtitle editing */
+customSubtitleInput.addEventListener('input', ()=> autoGrowTextarea(customSubtitleInput));
 customSubtitleInput.addEventListener('blur', ()=>{
   if(!isOwner) return;
   const val = customSubtitleInput.value.trim();
   customSubtitleInput.value = val;
+  autoGrowTextarea(customSubtitleInput);
   saveSubtitle(val);
   refreshSubtitleVisibility();
 });
-customSubtitleInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); customSubtitleInput.blur(); } });
 subtitlePencil.addEventListener('click', ()=>{
   if(!isOwner){ showToast('只有管理者可以修改副標'); return; }
   customSubtitleInput.focus();

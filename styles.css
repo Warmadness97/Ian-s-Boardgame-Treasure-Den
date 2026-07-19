@@ -80,14 +80,16 @@ body.is-owner .banner-upload-btn{display:flex;}
   border-top:1px solid rgba(243,234,211,0.15);
 }
 
-.custom-subtitle-box{display:flex;align-items:center;gap:8px;margin-top:2px;}
+.custom-subtitle-box{display:flex;align-items:flex-start;gap:8px;margin-top:2px;}
 #custom-subtitle{
   border:none;background:transparent;color:var(--text-on-bg-soft);
-  font-family:'Inter',sans-serif;font-size:15px;font-style:italic;
-  outline:none;padding:2px 4px;border-radius:6px;flex:1;min-width:120px;
+  font-family:'Inter',sans-serif;font-size:15px;font-style:italic;line-height:1.5;
+  outline:none;padding:2px 4px;border-radius:6px;flex:1;min-width:120px;width:100%;
+  resize:none;overflow:hidden;white-space:pre-wrap;word-wrap:break-word;
 }
 #custom-subtitle::placeholder{color:rgba(243,234,211,0.5);}
 #custom-subtitle:hover, #custom-subtitle:focus{background:rgba(217,142,4,0.16);}
+.custom-subtitle-box .edit-pencil{margin-top:6px;}
 
 .owner-only{display:none;}
 body.is-owner .owner-only{display:inline-flex;}

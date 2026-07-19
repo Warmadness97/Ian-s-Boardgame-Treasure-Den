@@ -6,7 +6,7 @@
 <title>桌遊資料庫</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
         </div>
       </div>
       <div class="custom-subtitle-box">
-        <input id="custom-subtitle" value="" placeholder="加一句副標語，例如：週末聚會桌遊收藏" readonly />
+        <textarea id="custom-subtitle" placeholder="加一句副標語，例如：週末聚會桌遊收藏&#10;可以按 Enter 換行" rows="1" readonly></textarea>
         <svg class="edit-pencil owner-only" id="subtitle-pencil" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       </div>
     </div>
@@ -267,6 +267,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=3"></script>
 </body>
 </html>
