@@ -314,12 +314,12 @@ function renderCard(g){
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
       ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
+      ${g.year ? `<div class="card-year">${CALENDAR_ICON}${g.year}</div>` : ''}
       ${g.difficulty ? `<div class="difficulty-stars">${renderStars(g.difficulty)}</div>` : ''}
       ${genreTags ? `<div class="tags">${genreTags}</div>` : ''}
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
       <div class="stats-row">
-        ${g.year ? `<div class="stat">${CALENDAR_ICON}${g.year}</div>` : ''}
         <div class="stat">${DICE_ICON}${players}</div>
         <div class="stat">${HOURGLASS_ICON}${time}</div>
       </div>
