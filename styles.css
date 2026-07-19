@@ -134,6 +134,11 @@ body.is-logged-in .user-chip{display:flex;}
   font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;cursor:pointer;
 }
 .btn-filter:hover{border-color:var(--accent-mustard);}
+.sort-select{
+  padding:12px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;color:var(--ink);cursor:pointer;
+}
+.sort-select:focus{outline:none;border-color:var(--accent-mustard);}
 .filter-badge{
   background:var(--accent-mustard);color:#fff;font-size:11px;font-weight:700;
   min-width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -222,6 +227,20 @@ body.is-logged-in .user-chip{display:flex;}
 .card-img-badges span{
   background:rgba(255,252,244,0.94);box-shadow:0 1px 5px rgba(0,0,0,0.3);
   text-align:right;
+}
+.card-new-badge{
+  position:absolute;top:8px;left:8px;z-index:2;
+  background:var(--accent-brick);color:#fff;
+  font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;
+  font-family:'IBM Plex Mono',monospace;box-shadow:0 1px 5px rgba(0,0,0,0.35);
+  animation:new-badge-pulse 1.8s ease-in-out infinite;
+}
+@keyframes new-badge-pulse{
+  0%, 100%{transform:scale(1);}
+  50%{transform:scale(1.06);}
+}
+@media (prefers-reduced-motion: reduce){
+  .card-new-badge{animation:none;}
 }
 .card-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
 .card-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;line-height:1.25;}

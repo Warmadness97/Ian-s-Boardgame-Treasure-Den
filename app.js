@@ -45,6 +45,7 @@ const genreFilterSelect = document.getElementById('filter-genre');
 const seriesFilterSelect = document.getElementById('filter-series');
 const yearFilterSelect = document.getElementById('filter-year');
 const difficultyFilterSelect = document.getElementById('filter-difficulty');
+const sortSelect = document.getElementById('sort-select');
 const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
@@ -99,6 +100,22 @@ function renderStars(n){
     out += `<span class="${i<=n ? 'filled':'empty'}">★</span>`;
   }
   return out;
+}
+
+function isNewGame(g){
+  const sec = g.createdAt && g.createdAt.seconds;
+  if(!sec) return false;
+  return (Date.now() - sec*1000) < 24*60*60*1000;
+}
+
+function applySort(list, mode){
+  const sorted = [...list];
+  if(mode === 'name'){
+    sorted.sort((a,b)=> (a.name||'').localeCompare((b.name||''), 'zh-Hant'));
+  } else {
+    sorted.sort((a,b)=> ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0));
+  }
+  return sorted;
 }
 
 function setDifficultyInputValue(val){
@@ -290,9 +307,10 @@ function renderCard(g){
     : `<div class="placeholder">尚未上傳圖片</div>`;
   const cornerBadges = (expansionTag || seriesTag || langTags)
     ? `<div class="card-img-badges">${expansionTag}${seriesTag}${langTags}</div>` : '';
+  const newBadge = isNewGame(g) ? `<div class="card-new-badge">新發現！</div>` : '';
   return `
   <div class="card" data-id="${g.id}">
-    <div class="card-img">${imgHtml}${cornerBadges}</div>
+    <div class="card-img">${imgHtml}${cornerBadges}${newBadge}</div>
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
       ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
@@ -384,6 +402,7 @@ function renderGrid(){
   }
   updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter});
   countLabel.textContent = games.length;
+  list = applySort(list, sortSelect.value);
   if(list.length === 0){
     grid.style.display = 'none';
     emptyEl.style.display = 'block';
@@ -622,6 +641,7 @@ genreFilterSelect.addEventListener('change', renderGrid);
 seriesFilterSelect.addEventListener('change', renderGrid);
 yearFilterSelect.addEventListener('change', renderGrid);
 difficultyFilterSelect.addEventListener('change', renderGrid);
+sortSelect.addEventListener('change', renderGrid);
 resetFiltersBtn.addEventListener('click', ()=>{
   document.getElementById('search-input').value = '';
   document.getElementById('filter-players').value = '0';
@@ -849,3 +869,6 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = originalLabel;
   showToast(`匯入完成：成功 ${successCount} 筆，略過 ${skipCount} 筆`);
 });
+
+/* 定時重繪，讓「新發現！」徽章滿 24 小時後能自動消失（不需重新整理頁面） */
+setInterval(()=>{ if(games.length) renderGrid(); }, 5 * 60 * 1000);
