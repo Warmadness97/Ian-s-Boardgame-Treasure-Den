@@ -20,6 +20,7 @@ let isOwner = false;
 
 const DICE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="16" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="16" r="1.4" fill="currentColor"/><circle cx="16" cy="16" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>';
 const HOURGLASS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12M6 22h12M6 2c0 5 5 6 6 8-1 2-6 3-6 8M18 2c0 5-5 6-6 8 1 2 6 3 6 8"/></svg>';
+const CALENDAR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
 const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
@@ -42,6 +43,7 @@ const langFilterSelect = document.getElementById('filter-lang');
 const typeFilterSelect = document.getElementById('filter-type');
 const genreFilterSelect = document.getElementById('filter-genre');
 const seriesFilterSelect = document.getElementById('filter-series');
+const yearFilterSelect = document.getElementById('filter-year');
 const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
@@ -73,6 +75,8 @@ const subtitlePencil = document.getElementById('subtitle-pencil');
 const filterToggleBtn = document.getElementById('filter-toggle-btn');
 const filterPanel = document.getElementById('filter-panel');
 const filterBadge = document.getElementById('filter-badge');
+const listToggleBtn = document.getElementById('list-toggle-btn');
+const listPanel = document.getElementById('list-panel');
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -164,6 +168,7 @@ onSnapshot(gamesCol, (snap)=>{
   updateBaseGameOptions();
   updateGenreFilterOptions();
   updateSeriesFilterOptions();
+  updateYearFilterOptions();
   renderGrid();
 }, (err)=>{
   console.error(err);
@@ -230,6 +235,15 @@ function updateSeriesFilterOptions(){
   if([...seriesSet].includes(current)) seriesFilterSelect.value = current;
 }
 
+function updateYearFilterOptions(){
+  const years = new Set();
+  games.forEach(g => { if(g.year) years.add(g.year); });
+  const current = yearFilterSelect.value;
+  yearFilterSelect.innerHTML = '<option value="">不限年份</option>' +
+    [...years].sort((a,b)=>b-a).map(y => `<option value="${y}">${y}</option>`).join('');
+  if([...years].map(String).includes(current)) yearFilterSelect.value = current;
+}
+
 function renderCard(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
@@ -252,6 +266,7 @@ function renderCard(g){
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
       <div class="stats-row">
+        ${g.year ? `<div class="stat">${CALENDAR_ICON}${g.year}</div>` : ''}
         <div class="stat">${DICE_ICON}${players}</div>
         <div class="stat">${HOURGLASS_ICON}${time}</div>
       </div>
@@ -271,17 +286,19 @@ function currentFilters(){
     langFilter: langFilterSelect.value,
     typeFilter: typeFilterSelect.value,
     genreFilter: genreFilterSelect.value,
-    seriesFilter: seriesFilterSelect.value
+    seriesFilter: seriesFilterSelect.value,
+    yearFilter: yearFilterSelect.value
   };
 }
 
-function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter}){
+function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter}){
   let count = 0;
   if(minPlayerFilter > 0) count++;
   if(langFilter) count++;
   if(typeFilter) count++;
   if(genreFilter) count++;
   if(seriesFilter) count++;
+  if(yearFilter) count++;
   if(count > 0){
     filterBadge.textContent = count;
     filterBadge.style.display = 'flex';
@@ -291,7 +308,7 @@ function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter
 }
 
 function renderGrid(){
-  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter} = currentFilters();
+  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter} = currentFilters();
   let list = games;
   if(q){
     list = list.filter(g =>
@@ -322,7 +339,10 @@ function renderGrid(){
   if(seriesFilter){
     list = list.filter(g => g.series === seriesFilter);
   }
-  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter});
+  if(yearFilter){
+    list = list.filter(g => String(g.year||'') === yearFilter);
+  }
+  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter});
   countLabel.textContent = games.length;
   if(list.length === 0){
     grid.style.display = 'none';
@@ -351,6 +371,7 @@ function openModal(mode, game){
   document.getElementById('f-basegame').value = game ? (game.baseGameName || '') : '';
   document.getElementById('f-series').value = game ? (game.series || '') : '';
   document.getElementById('f-url').value = game ? (game.url || '') : '';
+  document.getElementById('f-year').value = game ? (game.year || '') : '';
   baseGameField.style.display = gameType === 'expansion' ? 'block' : 'none';
   document.getElementById('f-desc').value = game ? (game.desc||'') : '';
   document.getElementById('f-minp').value = game ? game.minPlayers : '';
@@ -428,6 +449,8 @@ form.addEventListener('submit', async (e)=>{
   const baseGameName = document.getElementById('f-basegame').value.trim();
   const series = document.getElementById('f-series').value.trim();
   const url = document.getElementById('f-url').value.trim();
+  const yearRaw = document.getElementById('f-year').value.trim();
+  const year = yearRaw ? parseInt(yearRaw, 10) : null;
   const desc = document.getElementById('f-desc').value.trim();
   const minPlayers = parseInt(document.getElementById('f-minp').value,10);
   const maxPlayers = parseInt(document.getElementById('f-maxp').value,10);
@@ -443,7 +466,7 @@ form.addEventListener('submit', async (e)=>{
 
   const payload = {
     name, nameEn, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
-    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url,
+    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url, year,
     image: pendingImageData || null
   };
 
@@ -479,7 +502,7 @@ function openDetailModal(g){
   detailNameEn.textContent = g.nameEn || '';
   detailTags.innerHTML = expansionTag + seriesTag + genreTags + langTags;
   detailBaseGame.textContent = (g.gameType === 'expansion' && g.baseGameName) ? `→ 擴充自「${g.baseGameName}」` : '';
-  detailStats.innerHTML = `<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
+  detailStats.innerHTML = `${g.year ? `<div class="stat">${CALENDAR_ICON}${g.year}</div>` : ''}<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
   detailDesc.textContent = g.desc || '（尚未填寫簡介）';
   if(g.url){
     detailLink.href = g.url;
@@ -532,6 +555,7 @@ langFilterSelect.addEventListener('change', renderGrid);
 typeFilterSelect.addEventListener('change', renderGrid);
 genreFilterSelect.addEventListener('change', renderGrid);
 seriesFilterSelect.addEventListener('change', renderGrid);
+yearFilterSelect.addEventListener('change', renderGrid);
 resetFiltersBtn.addEventListener('click', ()=>{
   document.getElementById('search-input').value = '';
   document.getElementById('filter-players').value = '0';
@@ -539,6 +563,7 @@ resetFiltersBtn.addEventListener('click', ()=>{
   typeFilterSelect.value = '';
   genreFilterSelect.value = '';
   seriesFilterSelect.value = '';
+  yearFilterSelect.value = '';
   renderGrid();
   filterPanel.classList.remove('show');
 });
@@ -611,14 +636,23 @@ bannerRemoveBtn.addEventListener('click', async ()=>{
   showToast('已移除橫幅圖片');
 });
 
-/* filter panel toggle */
+/* filter & list dropdowns */
 filterToggleBtn.addEventListener('click', (e)=>{
   e.stopPropagation();
+  listPanel.classList.remove('show');
   filterPanel.classList.toggle('show');
+});
+listToggleBtn.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  filterPanel.classList.remove('show');
+  listPanel.classList.toggle('show');
 });
 document.addEventListener('click', (e)=>{
   if(!e.target.closest('.filter-dropdown')){
     filterPanel.classList.remove('show');
+  }
+  if(!e.target.closest('.list-dropdown')){
+    listPanel.classList.remove('show');
   }
 });
 
@@ -629,14 +663,16 @@ function csvEscape(val){
   return s;
 }
 downloadBtn.addEventListener('click', ()=>{
+  listPanel.classList.remove('show');
   if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
-  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','發行年份','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
   const rows = games.map(g => [
     g.name,
     g.nameEn || '',
     g.gameType === 'expansion' ? '擴充' : '主遊戲',
     g.gameType === 'expansion' ? (g.baseGameName||'') : '',
     g.series || '',
+    g.year || '',
     (g.genres||[]).join('、'),
     (g.languages||[]).join('、'),
     g.minPlayers, g.maxPlayers, g.minTime, g.maxTime,
@@ -687,6 +723,7 @@ function parseCSV(text){
 }
 
 importBtn.addEventListener('click', ()=>{
+  listPanel.classList.remove('show');
   if(!isOwner){ showToast('只有管理者可以匯入清單'); return; }
   importFileInput.value = '';
   importFileInput.click();
@@ -702,7 +739,7 @@ importFileInput.addEventListener('change', async (e)=>{
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
   // 依下載清單的欄位順序解析：
-  // 名稱,英文名稱,類型,所屬主遊戲,系列,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 名稱,英文名稱,類型,所屬主遊戲,系列,發行年份,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
@@ -710,7 +747,7 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const [name, nameEn, typeLabel, baseGameName, series, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
+    const [name, nameEn, typeLabel, baseGameName, series, yearStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
     const trimmedName = (name||'').trim();
     const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
     const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
@@ -720,11 +757,12 @@ importFileInput.addEventListener('change', async (e)=>{
     const gameType = (typeLabel||'').trim() === '擴充' ? 'expansion' : 'base';
     const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
+    const yearParsed = parseInt((yearStr||'').trim(), 10);
     const payload = {
       name: trimmedName, nameEn: (nameEn||'').trim(), genres, languages, desc: (desc||'').trim(),
       minPlayers, maxPlayers, minTime, maxTime,
       gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '',
-      series: (series||'').trim(), url: (url||'').trim(),
+      series: (series||'').trim(), url: (url||'').trim(), year: isNaN(yearParsed) ? null : yearParsed,
       image: null, createdAt: serverTimestamp()
     };
     try{
