@@ -12,7 +12,6 @@ export const firebaseConfig = {
     appId: "1:455233771867:web:40971c122ac0112128627e"
 };
 
-
 // 只有這個信箱登入後才能新增／編輯／刪除桌遊與修改標題，
 // 其他人登入後仍只能瀏覽與搜尋。
 export const OWNER_EMAIL = "ianlin1997@gmail.com";

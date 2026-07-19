@@ -62,6 +62,17 @@ const detailBaseGame = document.getElementById('detail-basegame');
 const detailStats = document.getElementById('detail-stats');
 const detailDesc = document.getElementById('detail-desc');
 const detailLink = document.getElementById('detail-link');
+const detailNameEn = document.getElementById('detail-name-en');
+const bannerEl = document.getElementById('banner');
+const bannerImg = document.getElementById('banner-img');
+const bannerUploadBtn = document.getElementById('banner-upload-btn');
+const bannerRemoveBtn = document.getElementById('banner-remove-btn');
+const bannerFileInput = document.getElementById('banner-file-input');
+const customSubtitleInput = document.getElementById('custom-subtitle');
+const subtitlePencil = document.getElementById('subtitle-pencil');
+const filterToggleBtn = document.getElementById('filter-toggle-btn');
+const filterPanel = document.getElementById('filter-panel');
+const filterBadge = document.getElementById('filter-badge');
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -80,6 +91,9 @@ onAuthStateChanged(auth, (user)=>{
   document.body.classList.toggle('is-logged-in', !!user);
   document.body.classList.toggle('is-owner', isOwner);
   titleInput.readOnly = !isOwner;
+  customSubtitleInput.readOnly = !isOwner;
+  refreshSubtitleVisibility();
+  bannerRemoveBtn.style.display = (isOwner && bannerEl.classList.contains('has-image')) ? 'flex' : 'none';
   if(user){
     userAvatar.src = user.photoURL || '';
     userName.textContent = user.displayName || user.email || '已登入';
@@ -92,7 +106,18 @@ loginBtn.addEventListener('click', async ()=>{
     await signInWithPopup(auth, googleProvider);
   }catch(err){
     console.error(err);
-    showToast('登入失敗，請確認 Firebase 主控台已啟用 Google 登入方式');
+    const code = err && err.code ? err.code : '未知錯誤';
+    if(code === 'auth/unauthorized-domain'){
+      showToast('登入失敗（auth/unauthorized-domain）：此網域尚未加入 Firebase 已授權網域清單');
+    } else if(code === 'auth/operation-not-allowed'){
+      showToast('登入失敗（auth/operation-not-allowed）：Firebase 尚未啟用 Google 登入方式');
+    } else if(code === 'auth/popup-blocked'){
+      showToast('登入視窗被瀏覽器擋下，請允許彈出視窗後再試一次');
+    } else if(code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'){
+      // 使用者自己關掉登入視窗，不需要顯示錯誤
+    } else {
+      showToast(`登入失敗（${code}）：請確認 Firebase 設定`);
+    }
   }
 });
 logoutBtn.addEventListener('click', ()=>{
@@ -100,12 +125,31 @@ logoutBtn.addEventListener('click', ()=>{
 });
 
 /* ---------- Real-time sync ---------- */
+function refreshSubtitleVisibility(){
+  const box = customSubtitleInput.closest('.custom-subtitle-box');
+  box.style.display = (customSubtitleInput.value.trim() || isOwner) ? 'flex' : 'none';
+}
+
 onSnapshot(siteMetaRef, (snap)=>{
   if(snap.exists() && !titleSyncing){
     const data = snap.data();
     if(data.title && document.activeElement !== titleInput){
       titleInput.value = data.title;
     }
+    if(document.activeElement !== customSubtitleInput){
+      customSubtitleInput.value = data.subtitle || '';
+    }
+    if(data.headerImage){
+      bannerImg.src = data.headerImage;
+      bannerImg.style.display = 'block';
+      bannerEl.classList.add('has-image');
+      bannerRemoveBtn.style.display = isOwner ? 'flex' : 'none';
+    } else {
+      bannerImg.style.display = 'none';
+      bannerEl.classList.remove('has-image');
+      bannerRemoveBtn.style.display = 'none';
+    }
+    refreshSubtitleVisibility();
   }
 }, (err)=>{
   console.error(err);
@@ -134,6 +178,22 @@ async function saveTitle(val){
     showToast('標題儲存失敗，請確認網路連線與 Firebase 設定');
   }
   titleSyncing = false;
+}
+
+async function saveSubtitle(val){
+  try{
+    await setDoc(siteMetaRef, { subtitle: val }, { merge: true });
+  }catch(e){
+    showToast('副標儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveBannerImage(dataUrlOrNull){
+  try{
+    await setDoc(siteMetaRef, { headerImage: dataUrlOrNull }, { merge: true });
+  }catch(e){
+    showToast('橫幅圖片儲存失敗，圖片可能過大或網路連線不穩');
+  }
 }
 
 /* ---------- Rendering ---------- */
@@ -187,6 +247,7 @@ function renderCard(g){
     <div class="card-img">${imgHtml}</div>
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
+      ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
       <div class="tags">${expansionTag}${seriesTag}${genreTags}${langTags}</div>
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
@@ -214,12 +275,28 @@ function currentFilters(){
   };
 }
 
+function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter}){
+  let count = 0;
+  if(minPlayerFilter > 0) count++;
+  if(langFilter) count++;
+  if(typeFilter) count++;
+  if(genreFilter) count++;
+  if(seriesFilter) count++;
+  if(count > 0){
+    filterBadge.textContent = count;
+    filterBadge.style.display = 'flex';
+  } else {
+    filterBadge.style.display = 'none';
+  }
+}
+
 function renderGrid(){
   const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter} = currentFilters();
   let list = games;
   if(q){
     list = list.filter(g =>
       g.name.toLowerCase().includes(q) ||
+      (g.nameEn||'').toLowerCase().includes(q) ||
       (g.genres||[]).some(t=>t.toLowerCase().includes(q)) ||
       (g.languages||[]).some(t=>t.toLowerCase().includes(q)) ||
       (g.series||'').toLowerCase().includes(q) ||
@@ -245,6 +322,7 @@ function renderGrid(){
   if(seriesFilter){
     list = list.filter(g => g.series === seriesFilter);
   }
+  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter});
   countLabel.textContent = games.length;
   if(list.length === 0){
     grid.style.display = 'none';
@@ -264,6 +342,7 @@ function openModal(mode, game){
   editingId = mode === 'edit' ? game.id : null;
   document.getElementById('modal-title').textContent = mode === 'edit' ? '編輯桌遊' : '新增桌遊';
   document.getElementById('f-name').value = game ? game.name : '';
+  document.getElementById('f-name-en').value = game ? (game.nameEn || '') : '';
   document.getElementById('f-genre').value = game ? (game.genres||[]).join(', ') : '';
   document.getElementById('f-lang').value = game ? (game.languages||[]).join(', ') : '';
   const gameType = game ? (game.gameType || 'base') : 'base';
@@ -342,6 +421,7 @@ form.addEventListener('submit', async (e)=>{
   saveBtn.disabled = true; saveBtn.textContent = '儲存中…';
 
   const name = document.getElementById('f-name').value.trim();
+  const nameEn = document.getElementById('f-name-en').value.trim();
   const genres = document.getElementById('f-genre').value.split(',').map(s=>s.trim()).filter(Boolean);
   const languages = document.getElementById('f-lang').value.split(',').map(s=>s.trim()).filter(Boolean);
   const gameType = document.getElementById('f-type-expansion').checked ? 'expansion' : 'base';
@@ -362,7 +442,7 @@ form.addEventListener('submit', async (e)=>{
   }
 
   const payload = {
-    name, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
+    name, nameEn, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
     gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url,
     image: pendingImageData || null
   };
@@ -396,6 +476,7 @@ function openDetailModal(g){
     ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
   detailName.textContent = g.name;
+  detailNameEn.textContent = g.nameEn || '';
   detailTags.innerHTML = expansionTag + seriesTag + genreTags + langTags;
   detailBaseGame.textContent = (g.gameType === 'expansion' && g.baseGameName) ? `→ 擴充自「${g.baseGameName}」` : '';
   detailStats.innerHTML = `<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
@@ -459,6 +540,7 @@ resetFiltersBtn.addEventListener('click', ()=>{
   genreFilterSelect.value = '';
   seriesFilterSelect.value = '';
   renderGrid();
+  filterPanel.classList.remove('show');
 });
 
 /* title editing */
@@ -474,6 +556,72 @@ document.getElementById('title-pencil').addEventListener('click', ()=>{
   titleInput.focus();
 });
 
+/* subtitle editing */
+customSubtitleInput.addEventListener('blur', ()=>{
+  if(!isOwner) return;
+  const val = customSubtitleInput.value.trim();
+  customSubtitleInput.value = val;
+  saveSubtitle(val);
+  refreshSubtitleVisibility();
+});
+customSubtitleInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); customSubtitleInput.blur(); } });
+subtitlePencil.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以修改副標'); return; }
+  customSubtitleInput.focus();
+});
+
+/* banner image upload / remove */
+bannerUploadBtn.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以更換橫幅圖片'); return; }
+  bannerFileInput.value = '';
+  bannerFileInput.click();
+});
+bannerFileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file || !isOwner) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const img = new Image();
+    img.onload = async ()=>{
+      const maxW = 1400;
+      let w = img.width, h = img.height;
+      if(w > maxW){ h = Math.round(h*maxW/w); w = maxW; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      bannerImg.src = dataUrl;
+      bannerImg.style.display = 'block';
+      bannerEl.classList.add('has-image');
+      bannerRemoveBtn.style.display = 'flex';
+      await saveBannerImage(dataUrl);
+      showToast('已更新橫幅圖片');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+bannerRemoveBtn.addEventListener('click', async ()=>{
+  if(!isOwner) return;
+  if(!confirm('確定要移除橫幅圖片嗎？')) return;
+  bannerImg.style.display = 'none';
+  bannerEl.classList.remove('has-image');
+  bannerRemoveBtn.style.display = 'none';
+  await saveBannerImage(null);
+  showToast('已移除橫幅圖片');
+});
+
+/* filter panel toggle */
+filterToggleBtn.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  filterPanel.classList.toggle('show');
+});
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.filter-dropdown')){
+    filterPanel.classList.remove('show');
+  }
+});
+
 /* ---------- Download list as CSV ---------- */
 function csvEscape(val){
   const s = (val===undefined || val===null) ? '' : String(val);
@@ -482,9 +630,10 @@ function csvEscape(val){
 }
 downloadBtn.addEventListener('click', ()=>{
   if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
-  const headers = ['名稱','類型','所屬主遊戲','系列','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
   const rows = games.map(g => [
     g.name,
+    g.nameEn || '',
     g.gameType === 'expansion' ? '擴充' : '主遊戲',
     g.gameType === 'expansion' ? (g.baseGameName||'') : '',
     g.series || '',
@@ -553,7 +702,7 @@ importFileInput.addEventListener('change', async (e)=>{
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
   // 依下載清單的欄位順序解析：
-  // 名稱,類型,所屬主遊戲,系列,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 名稱,英文名稱,類型,所屬主遊戲,系列,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
@@ -561,7 +710,7 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const [name, typeLabel, baseGameName, series, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
+    const [name, nameEn, typeLabel, baseGameName, series, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
     const trimmedName = (name||'').trim();
     const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
     const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
@@ -572,7 +721,7 @@ importFileInput.addEventListener('change', async (e)=>{
     const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const payload = {
-      name: trimmedName, genres, languages, desc: (desc||'').trim(),
+      name: trimmedName, nameEn: (nameEn||'').trim(), genres, languages, desc: (desc||'').trim(),
       minPlayers, maxPlayers, minTime, maxTime,
       gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '',
       series: (series||'').trim(), url: (url||'').trim(),
