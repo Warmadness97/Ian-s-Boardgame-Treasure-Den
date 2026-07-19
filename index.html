@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌遊資料庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <div class="header">
+    <div class="title-box">
+      <input id="site-title" value="桌遊資料庫" readonly />
+      <svg class="edit-pencil logged-in-only" id="title-pencil" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </div>
+    <div class="auth-box" id="auth-box">
+      <button class="btn-login" id="login-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#FFF" d="M21.35 11.1h-9.17v2.94h5.26c-.23 1.5-1.7 4.4-5.26 4.4-3.17 0-5.75-2.62-5.75-5.85s2.58-5.85 5.75-5.85c1.8 0 3.01.77 3.7 1.43l2.52-2.43C16.96 3.9 14.87 3 12.18 3 6.98 3 2.78 7.2 2.78 12.4s4.2 9.4 9.4 9.4c5.42 0 9.02-3.81 9.02-9.18 0-.62-.07-1.09-.15-1.52z"/></svg>
+        使用 Google 登入
+      </button>
+      <div class="user-chip" id="user-chip" style="display:none;">
+        <img id="user-avatar" src="" alt="">
+        <span id="user-name"></span>
+        <button id="logout-btn" title="登出">登出</button>
+      </div>
+    </div>
+  </div>
+  <div class="subtitle" id="subtitle-text">登入後即可新增、編輯、刪除桌遊與修改標題（所有人皆可瀏覽與搜尋） · 目前收錄 <span id="count-label">0</span> 款桌遊</div>
+  <div class="rule"></div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search-input" type="text" placeholder="搜尋名稱、類型或語言版本…" />
+    </div>
+    <select id="filter-players">
+      <option value="0">不限人數</option>
+      <option value="1">1 人可玩</option>
+      <option value="2">2 人可玩</option>
+      <option value="3">3 人可玩</option>
+      <option value="4">4 人可玩</option>
+      <option value="5">5 人可玩</option>
+      <option value="6">6 人以上</option>
+    </select>
+    <select id="filter-lang">
+      <option value="">不限語言版本</option>
+    </select>
+    <button class="btn-add logged-in-only" id="open-add-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+      新增桌遊
+    </button>
+  </div>
+
+  <div id="loading" class="empty-state">載入中…</div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty-state" style="display:none;"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modal-title">新增桌遊</h2>
+    <form id="game-form">
+      <div class="field">
+        <label>桌遊圖片（會自動壓縮）</label>
+        <div class="img-upload" id="img-upload-box">
+          <img id="img-preview" style="display:none;" />
+          <div class="hint" id="img-hint">點擊或拖曳圖片到此處上傳</div>
+          <input type="file" id="img-input" accept="image/*" />
+        </div>
+      </div>
+      <div class="field">
+        <label>名稱</label>
+        <input type="text" id="f-name" required placeholder="例如：卡卡頌">
+      </div>
+      <div class="field">
+        <label>類型（以逗號分隔）</label>
+        <input type="text" id="f-genre" placeholder="策略, 派對, 合作">
+      </div>
+      <div class="field">
+        <label>語言版本（以逗號分隔）</label>
+        <input type="text" id="f-lang" placeholder="繁體中文, English, 日本語">
+      </div>
+      <div class="field">
+        <label>簡介</label>
+        <textarea id="f-desc" placeholder="簡短描述遊戲玩法與特色"></textarea>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>遊玩人數</label>
+          <div class="num-group">
+            <input type="number" id="f-minp" min="1" placeholder="最少" required>
+            <span>–</span>
+            <input type="number" id="f-maxp" min="1" placeholder="最多" required>
+          </div>
+        </div>
+        <div class="field">
+          <label>遊玩時間（分鐘）</label>
+          <div class="num-group">
+            <input type="number" id="f-mint" min="1" placeholder="最少" required>
+            <span>–</span>
+            <input type="number" id="f-maxt" min="1" placeholder="最多" required>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="f-id">
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="cancel-btn">取消</button>
+        <button type="submit" class="btn-primary" id="save-btn">儲存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
