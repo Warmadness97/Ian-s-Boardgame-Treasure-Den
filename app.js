@@ -44,11 +44,15 @@ const typeFilterSelect = document.getElementById('filter-type');
 const genreFilterSelect = document.getElementById('filter-genre');
 const seriesFilterSelect = document.getElementById('filter-series');
 const yearFilterSelect = document.getElementById('filter-year');
+const difficultyFilterSelect = document.getElementById('filter-difficulty');
 const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
 const baseGameList = document.getElementById('base-game-list');
 const baseGameField = document.getElementById('base-game-field');
+const difficultyInputEl = document.getElementById('f-difficulty');
+const difficultyStarBtns = document.querySelectorAll('#difficulty-input .star-btn');
+const difficultyClearBtn = document.getElementById('difficulty-clear');
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userChip = document.getElementById('user-chip');
@@ -65,6 +69,7 @@ const detailStats = document.getElementById('detail-stats');
 const detailDesc = document.getElementById('detail-desc');
 const detailLink = document.getElementById('detail-link');
 const detailNameEn = document.getElementById('detail-name-en');
+const detailDifficulty = document.getElementById('detail-difficulty');
 const bannerEl = document.getElementById('banner');
 const bannerImg = document.getElementById('banner-img');
 const bannerUploadBtn = document.getElementById('banner-upload-btn');
@@ -87,6 +92,28 @@ function showToast(msg){
 function escapeHtml(str){
   return (str||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+function renderStars(n){
+  if(!n) return '';
+  let out = '';
+  for(let i=1;i<=5;i++){
+    out += `<span class="${i<=n ? 'filled':'empty'}">★</span>`;
+  }
+  return out;
+}
+
+function setDifficultyInputValue(val){
+  difficultyInputEl.value = val;
+  difficultyStarBtns.forEach(btn=>{
+    btn.classList.toggle('filled', parseInt(btn.dataset.value,10) <= val);
+  });
+}
+difficultyStarBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    setDifficultyInputValue(parseInt(btn.dataset.value,10));
+  });
+});
+difficultyClearBtn.addEventListener('click', ()=> setDifficultyInputValue(0));
 
 /* ---------- Auth ---------- */
 onAuthStateChanged(auth, (user)=>{
@@ -262,6 +289,7 @@ function renderCard(g){
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
       ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
+      ${g.difficulty ? `<div class="difficulty-stars">${renderStars(g.difficulty)}</div>` : ''}
       <div class="tags">${expansionTag}${seriesTag}${genreTags}${langTags}</div>
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
@@ -287,11 +315,12 @@ function currentFilters(){
     typeFilter: typeFilterSelect.value,
     genreFilter: genreFilterSelect.value,
     seriesFilter: seriesFilterSelect.value,
-    yearFilter: yearFilterSelect.value
+    yearFilter: yearFilterSelect.value,
+    difficultyFilter: difficultyFilterSelect.value
   };
 }
 
-function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter}){
+function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter}){
   let count = 0;
   if(minPlayerFilter > 0) count++;
   if(langFilter) count++;
@@ -299,6 +328,7 @@ function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter
   if(genreFilter) count++;
   if(seriesFilter) count++;
   if(yearFilter) count++;
+  if(difficultyFilter) count++;
   if(count > 0){
     filterBadge.textContent = count;
     filterBadge.style.display = 'flex';
@@ -308,7 +338,7 @@ function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter
 }
 
 function renderGrid(){
-  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter} = currentFilters();
+  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter} = currentFilters();
   let list = games;
   if(q){
     list = list.filter(g =>
@@ -342,7 +372,10 @@ function renderGrid(){
   if(yearFilter){
     list = list.filter(g => String(g.year||'') === yearFilter);
   }
-  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter});
+  if(difficultyFilter){
+    list = list.filter(g => String(g.difficulty||'') === difficultyFilter);
+  }
+  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter});
   countLabel.textContent = games.length;
   if(list.length === 0){
     grid.style.display = 'none';
@@ -372,6 +405,7 @@ function openModal(mode, game){
   document.getElementById('f-series').value = game ? (game.series || '') : '';
   document.getElementById('f-url').value = game ? (game.url || '') : '';
   document.getElementById('f-year').value = game ? (game.year || '') : '';
+  setDifficultyInputValue(game ? (game.difficulty || 0) : 0);
   baseGameField.style.display = gameType === 'expansion' ? 'block' : 'none';
   document.getElementById('f-desc').value = game ? (game.desc||'') : '';
   document.getElementById('f-minp').value = game ? game.minPlayers : '';
@@ -394,6 +428,7 @@ function closeModal(){
   pendingImageData = null;
   editingId = null;
   baseGameField.style.display = 'none';
+  setDifficultyInputValue(0);
 }
 
 document.getElementById('open-add-btn').addEventListener('click', ()=>{
@@ -451,6 +486,8 @@ form.addEventListener('submit', async (e)=>{
   const url = document.getElementById('f-url').value.trim();
   const yearRaw = document.getElementById('f-year').value.trim();
   const year = yearRaw ? parseInt(yearRaw, 10) : null;
+  const difficultyRaw = parseInt(difficultyInputEl.value, 10);
+  const difficulty = difficultyRaw > 0 ? difficultyRaw : null;
   const desc = document.getElementById('f-desc').value.trim();
   const minPlayers = parseInt(document.getElementById('f-minp').value,10);
   const maxPlayers = parseInt(document.getElementById('f-maxp').value,10);
@@ -466,7 +503,7 @@ form.addEventListener('submit', async (e)=>{
 
   const payload = {
     name, nameEn, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
-    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url, year,
+    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url, year, difficulty,
     image: pendingImageData || null
   };
 
@@ -500,6 +537,7 @@ function openDetailModal(g){
     : `<div class="placeholder">尚未上傳圖片</div>`;
   detailName.textContent = g.name;
   detailNameEn.textContent = g.nameEn || '';
+  detailDifficulty.innerHTML = g.difficulty ? renderStars(g.difficulty) : '';
   detailTags.innerHTML = expansionTag + seriesTag + genreTags + langTags;
   detailBaseGame.textContent = (g.gameType === 'expansion' && g.baseGameName) ? `→ 擴充自「${g.baseGameName}」` : '';
   detailStats.innerHTML = `${g.year ? `<div class="stat">${CALENDAR_ICON}${g.year}</div>` : ''}<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
@@ -556,6 +594,7 @@ typeFilterSelect.addEventListener('change', renderGrid);
 genreFilterSelect.addEventListener('change', renderGrid);
 seriesFilterSelect.addEventListener('change', renderGrid);
 yearFilterSelect.addEventListener('change', renderGrid);
+difficultyFilterSelect.addEventListener('change', renderGrid);
 resetFiltersBtn.addEventListener('click', ()=>{
   document.getElementById('search-input').value = '';
   document.getElementById('filter-players').value = '0';
@@ -564,6 +603,7 @@ resetFiltersBtn.addEventListener('click', ()=>{
   genreFilterSelect.value = '';
   seriesFilterSelect.value = '';
   yearFilterSelect.value = '';
+  difficultyFilterSelect.value = '';
   renderGrid();
   filterPanel.classList.remove('show');
 });
@@ -665,7 +705,7 @@ function csvEscape(val){
 downloadBtn.addEventListener('click', ()=>{
   listPanel.classList.remove('show');
   if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
-  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','發行年份','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const headers = ['名稱','英文名稱','類型','所屬主遊戲','系列','發行年份','難度(1-5)','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
   const rows = games.map(g => [
     g.name,
     g.nameEn || '',
@@ -673,6 +713,7 @@ downloadBtn.addEventListener('click', ()=>{
     g.gameType === 'expansion' ? (g.baseGameName||'') : '',
     g.series || '',
     g.year || '',
+    g.difficulty || '',
     (g.genres||[]).join('、'),
     (g.languages||[]).join('、'),
     g.minPlayers, g.maxPlayers, g.minTime, g.maxTime,
@@ -739,7 +780,7 @@ importFileInput.addEventListener('change', async (e)=>{
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
   // 依下載清單的欄位順序解析：
-  // 名稱,英文名稱,類型,所屬主遊戲,系列,發行年份,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 名稱,英文名稱,類型,所屬主遊戲,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
@@ -747,7 +788,7 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const [name, nameEn, typeLabel, baseGameName, series, yearStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
+    const [name, nameEn, typeLabel, baseGameName, series, yearStr, difficultyStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
     const trimmedName = (name||'').trim();
     const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
     const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
@@ -758,11 +799,13 @@ importFileInput.addEventListener('change', async (e)=>{
     const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const yearParsed = parseInt((yearStr||'').trim(), 10);
+    const difficultyParsed = parseInt((difficultyStr||'').trim(), 10);
     const payload = {
       name: trimmedName, nameEn: (nameEn||'').trim(), genres, languages, desc: (desc||'').trim(),
       minPlayers, maxPlayers, minTime, maxTime,
       gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '',
       series: (series||'').trim(), url: (url||'').trim(), year: isNaN(yearParsed) ? null : yearParsed,
+      difficulty: (difficultyParsed >= 1 && difficultyParsed <= 5) ? difficultyParsed : null,
       image: null, createdAt: serverTimestamp()
     };
     try{
