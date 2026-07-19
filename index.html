@@ -34,7 +34,7 @@
   <div class="toolbar">
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="search-input" type="text" placeholder="搜尋名稱、類型或語言版本…" />
+      <input id="search-input" type="text" placeholder="搜尋名稱、類型、語言版本或系列…" />
     </div>
     <select id="filter-players">
       <option value="0">不限人數</option>
@@ -48,9 +48,33 @@
     <select id="filter-lang">
       <option value="">不限語言版本</option>
     </select>
+    <select id="filter-genre">
+      <option value="">不限類型</option>
+    </select>
+    <select id="filter-series">
+      <option value="">不限系列</option>
+    </select>
+    <select id="filter-type">
+      <option value="">不限主遊戲／擴充</option>
+      <option value="base">只看主遊戲</option>
+      <option value="expansion">只看擴充</option>
+    </select>
+    <button class="btn-secondary-toolbar" id="reset-filters-btn">清除篩選</button>
+  </div>
+
+  <div class="toolbar">
     <button class="btn-add owner-only" id="open-add-btn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
       新增桌遊
+    </button>
+    <button class="btn-download owner-only" id="import-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21V9m0 0-4 4m4-4 4 4M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/></svg>
+      匯入清單
+    </button>
+    <input type="file" id="import-file-input" accept=".csv" style="display:none;">
+    <button class="btn-download" id="download-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      下載清單
     </button>
   </div>
 
@@ -84,6 +108,26 @@
         <input type="text" id="f-lang" placeholder="繁體中文, English, 日本語">
       </div>
       <div class="field">
+        <label>遊戲類型</label>
+        <div class="radio-group">
+          <label class="radio-pill"><input type="radio" name="f-type" id="f-type-base" value="base" checked> 主遊戲</label>
+          <label class="radio-pill"><input type="radio" name="f-type" id="f-type-expansion" value="expansion"> 擴充</label>
+        </div>
+      </div>
+      <div class="field" id="base-game-field" style="display:none;">
+        <label>此擴充所屬的主遊戲（選填）</label>
+        <input type="text" id="f-basegame" list="base-game-list" placeholder="例如：卡卡頌">
+        <datalist id="base-game-list"></datalist>
+      </div>
+      <div class="field">
+        <label>系列（選填，例如：卡卡頌系列）</label>
+        <input type="text" id="f-series" placeholder="若不屬於特定系列可留空">
+      </div>
+      <div class="field">
+        <label>網址連結（選填，例如 BGG 頁面或購買連結）</label>
+        <input type="text" id="f-url" placeholder="https://...">
+      </div>
+      <div class="field">
         <label>簡介</label>
         <textarea id="f-desc" placeholder="簡短描述遊戲玩法與特色"></textarea>
       </div>
@@ -115,6 +159,21 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="overlay" id="detail-overlay">
+  <div class="modal detail-modal">
+    <button class="detail-close" id="detail-close">✕</button>
+    <div class="detail-img" id="detail-img"></div>
+    <div class="detail-body">
+      <div class="detail-name" id="detail-name"></div>
+      <div class="tags" id="detail-tags"></div>
+      <div class="base-game-note" id="detail-basegame"></div>
+      <div class="stats-row" id="detail-stats"></div>
+      <div class="detail-desc" id="detail-desc"></div>
+      <a href="#" target="_blank" rel="noopener" class="detail-link" id="detail-link" style="display:none;">前往連結 →</a>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="app.js"></script>
 </body>

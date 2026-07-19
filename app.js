@@ -39,11 +39,29 @@ const imgPreview = document.getElementById('img-preview');
 const imgHint = document.getElementById('img-hint');
 const titleInput = document.getElementById('site-title');
 const langFilterSelect = document.getElementById('filter-lang');
+const typeFilterSelect = document.getElementById('filter-type');
+const genreFilterSelect = document.getElementById('filter-genre');
+const seriesFilterSelect = document.getElementById('filter-series');
+const resetFiltersBtn = document.getElementById('reset-filters-btn');
+const importBtn = document.getElementById('import-btn');
+const importFileInput = document.getElementById('import-file-input');
+const baseGameList = document.getElementById('base-game-list');
+const baseGameField = document.getElementById('base-game-field');
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userChip = document.getElementById('user-chip');
 const userAvatar = document.getElementById('user-avatar');
 const userName = document.getElementById('user-name');
+const downloadBtn = document.getElementById('download-btn');
+const detailOverlay = document.getElementById('detail-overlay');
+const detailClose = document.getElementById('detail-close');
+const detailImg = document.getElementById('detail-img');
+const detailName = document.getElementById('detail-name');
+const detailTags = document.getElementById('detail-tags');
+const detailBaseGame = document.getElementById('detail-basegame');
+const detailStats = document.getElementById('detail-stats');
+const detailDesc = document.getElementById('detail-desc');
+const detailLink = document.getElementById('detail-link');
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -99,6 +117,9 @@ onSnapshot(gamesCol, (snap)=>{
   games = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
   updateLangFilterOptions();
+  updateBaseGameOptions();
+  updateGenreFilterOptions();
+  updateSeriesFilterOptions();
   renderGrid();
 }, (err)=>{
   console.error(err);
@@ -125,11 +146,39 @@ function updateLangFilterOptions(){
   if([...langs].includes(current)) langFilterSelect.value = current;
 }
 
+function updateBaseGameOptions(){
+  const baseNames = games.filter(g => g.gameType !== 'expansion').map(g => g.name);
+  baseGameList.innerHTML = [...new Set(baseNames)].sort()
+    .map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+}
+
+function updateGenreFilterOptions(){
+  const genres = new Set();
+  games.forEach(g => (g.genres||[]).forEach(t => genres.add(t)));
+  const current = genreFilterSelect.value;
+  genreFilterSelect.innerHTML = '<option value="">不限類型</option>' +
+    [...genres].sort().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if([...genres].includes(current)) genreFilterSelect.value = current;
+}
+
+function updateSeriesFilterOptions(){
+  const seriesSet = new Set();
+  games.forEach(g => { if(g.series) seriesSet.add(g.series); });
+  const current = seriesFilterSelect.value;
+  seriesFilterSelect.innerHTML = '<option value="">不限系列</option>' +
+    [...seriesSet].sort().map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if([...seriesSet].includes(current)) seriesFilterSelect.value = current;
+}
+
 function renderCard(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
   const genreTags = (g.genres||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
   const langTags = (g.languages||[]).map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join('');
+  const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
+  const seriesTag = g.series ? `<span class="tag-series">${escapeHtml(g.series)} 系列</span>` : '';
+  const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
+    ? `<div class="base-game-note">→ 擴充自「${escapeHtml(g.baseGameName)}」</div>` : '';
   const imgHtml = g.image
     ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
@@ -138,7 +187,8 @@ function renderCard(g){
     <div class="card-img">${imgHtml}</div>
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
-      <div class="tags">${genreTags}${langTags}</div>
+      <div class="tags">${expansionTag}${seriesTag}${genreTags}${langTags}</div>
+      ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
       <div class="stats-row">
         <div class="stat">${DICE_ICON}${players}</div>
@@ -157,18 +207,23 @@ function currentFilters(){
   return {
     q: document.getElementById('search-input').value.trim().toLowerCase(),
     minPlayerFilter: parseInt(document.getElementById('filter-players').value, 10),
-    langFilter: langFilterSelect.value
+    langFilter: langFilterSelect.value,
+    typeFilter: typeFilterSelect.value,
+    genreFilter: genreFilterSelect.value,
+    seriesFilter: seriesFilterSelect.value
   };
 }
 
 function renderGrid(){
-  const {q, minPlayerFilter, langFilter} = currentFilters();
+  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter} = currentFilters();
   let list = games;
   if(q){
     list = list.filter(g =>
       g.name.toLowerCase().includes(q) ||
       (g.genres||[]).some(t=>t.toLowerCase().includes(q)) ||
-      (g.languages||[]).some(t=>t.toLowerCase().includes(q))
+      (g.languages||[]).some(t=>t.toLowerCase().includes(q)) ||
+      (g.series||'').toLowerCase().includes(q) ||
+      (g.baseGameName||'').toLowerCase().includes(q)
     );
   }
   if(minPlayerFilter > 0){
@@ -180,6 +235,15 @@ function renderGrid(){
   }
   if(langFilter){
     list = list.filter(g => (g.languages||[]).includes(langFilter));
+  }
+  if(typeFilter){
+    list = list.filter(g => (g.gameType||'base') === typeFilter);
+  }
+  if(genreFilter){
+    list = list.filter(g => (g.genres||[]).includes(genreFilter));
+  }
+  if(seriesFilter){
+    list = list.filter(g => g.series === seriesFilter);
   }
   countLabel.textContent = games.length;
   if(list.length === 0){
@@ -202,6 +266,13 @@ function openModal(mode, game){
   document.getElementById('f-name').value = game ? game.name : '';
   document.getElementById('f-genre').value = game ? (game.genres||[]).join(', ') : '';
   document.getElementById('f-lang').value = game ? (game.languages||[]).join(', ') : '';
+  const gameType = game ? (game.gameType || 'base') : 'base';
+  document.getElementById('f-type-base').checked = gameType === 'base';
+  document.getElementById('f-type-expansion').checked = gameType === 'expansion';
+  document.getElementById('f-basegame').value = game ? (game.baseGameName || '') : '';
+  document.getElementById('f-series').value = game ? (game.series || '') : '';
+  document.getElementById('f-url').value = game ? (game.url || '') : '';
+  baseGameField.style.display = gameType === 'expansion' ? 'block' : 'none';
   document.getElementById('f-desc').value = game ? (game.desc||'') : '';
   document.getElementById('f-minp').value = game ? game.minPlayers : '';
   document.getElementById('f-maxp').value = game ? game.maxPlayers : '';
@@ -222,6 +293,7 @@ function closeModal(){
   imgHint.textContent='點擊或拖曳圖片到此處上傳';
   pendingImageData = null;
   editingId = null;
+  baseGameField.style.display = 'none';
 }
 
 document.getElementById('open-add-btn').addEventListener('click', ()=>{
@@ -230,6 +302,12 @@ document.getElementById('open-add-btn').addEventListener('click', ()=>{
 });
 document.getElementById('cancel-btn').addEventListener('click', closeModal);
 overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
+
+document.querySelectorAll('input[name="f-type"]').forEach(radio=>{
+  radio.addEventListener('change', ()=>{
+    baseGameField.style.display = document.getElementById('f-type-expansion').checked ? 'block' : 'none';
+  });
+});
 
 /* image resize + compress (Firestore 單一文件上限 1MB，圖片壓縮到安全範圍內) */
 function handleImageFile(file){
@@ -266,6 +344,10 @@ form.addEventListener('submit', async (e)=>{
   const name = document.getElementById('f-name').value.trim();
   const genres = document.getElementById('f-genre').value.split(',').map(s=>s.trim()).filter(Boolean);
   const languages = document.getElementById('f-lang').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const gameType = document.getElementById('f-type-expansion').checked ? 'expansion' : 'base';
+  const baseGameName = document.getElementById('f-basegame').value.trim();
+  const series = document.getElementById('f-series').value.trim();
+  const url = document.getElementById('f-url').value.trim();
   const desc = document.getElementById('f-desc').value.trim();
   const minPlayers = parseInt(document.getElementById('f-minp').value,10);
   const maxPlayers = parseInt(document.getElementById('f-maxp').value,10);
@@ -279,7 +361,11 @@ form.addEventListener('submit', async (e)=>{
     showToast('最少值不可大於最多值'); saveBtn.disabled=false; saveBtn.textContent='儲存'; return;
   }
 
-  const payload = { name, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime, image: pendingImageData || null };
+  const payload = {
+    name, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
+    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url,
+    image: pendingImageData || null
+  };
 
   try{
     if(editingId){
@@ -298,14 +384,51 @@ form.addEventListener('submit', async (e)=>{
   saveBtn.disabled=false; saveBtn.textContent='儲存';
 });
 
-/* grid actions: edit / delete */
+function openDetailModal(g){
+  const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
+  const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
+  const genreTags = (g.genres||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+  const langTags = (g.languages||[]).map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join('');
+  const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
+  const seriesTag = g.series ? `<span class="tag-series">${escapeHtml(g.series)} 系列</span>` : '';
+
+  detailImg.innerHTML = g.image
+    ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
+    : `<div class="placeholder">尚未上傳圖片</div>`;
+  detailName.textContent = g.name;
+  detailTags.innerHTML = expansionTag + seriesTag + genreTags + langTags;
+  detailBaseGame.textContent = (g.gameType === 'expansion' && g.baseGameName) ? `→ 擴充自「${g.baseGameName}」` : '';
+  detailStats.innerHTML = `<div class="stat">${DICE_ICON}${players}</div><div class="stat">${HOURGLASS_ICON}${time}</div>`;
+  detailDesc.textContent = g.desc || '（尚未填寫簡介）';
+  if(g.url){
+    detailLink.href = g.url;
+    detailLink.style.display = 'inline-block';
+  } else {
+    detailLink.style.display = 'none';
+  }
+  detailOverlay.classList.add('show');
+}
+function closeDetailModal(){
+  detailOverlay.classList.remove('show');
+}
+detailClose.addEventListener('click', closeDetailModal);
+detailOverlay.addEventListener('click', (e)=>{ if(e.target === detailOverlay) closeDetailModal(); });
+
+/* grid actions: click card to view details, edit / delete for owner */
 grid.addEventListener('click', async (e)=>{
   const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  const id = btn.dataset.id;
-  const action = btn.dataset.action;
+  const card = e.target.closest('.card');
+  if(!card) return;
+  const id = card.dataset.id;
   const g = games.find(x=>x.id===id);
   if(!g) return;
+
+  if(!btn){
+    openDetailModal(g);
+    return;
+  }
+
+  const action = btn.dataset.action;
   if(!isOwner){ showToast('只有管理者可以編輯或刪除'); return; }
   if(action === 'edit'){
     openModal('edit', g);
@@ -325,6 +448,18 @@ grid.addEventListener('click', async (e)=>{
 document.getElementById('search-input').addEventListener('input', renderGrid);
 document.getElementById('filter-players').addEventListener('change', renderGrid);
 langFilterSelect.addEventListener('change', renderGrid);
+typeFilterSelect.addEventListener('change', renderGrid);
+genreFilterSelect.addEventListener('change', renderGrid);
+seriesFilterSelect.addEventListener('change', renderGrid);
+resetFiltersBtn.addEventListener('click', ()=>{
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-players').value = '0';
+  langFilterSelect.value = '';
+  typeFilterSelect.value = '';
+  genreFilterSelect.value = '';
+  seriesFilterSelect.value = '';
+  renderGrid();
+});
 
 /* title editing */
 titleInput.addEventListener('blur', ()=>{
@@ -337,4 +472,122 @@ titleInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefa
 document.getElementById('title-pencil').addEventListener('click', ()=>{
   if(!isOwner){ showToast('只有管理者可以修改標題'); return; }
   titleInput.focus();
+});
+
+/* ---------- Download list as CSV ---------- */
+function csvEscape(val){
+  const s = (val===undefined || val===null) ? '' : String(val);
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+downloadBtn.addEventListener('click', ()=>{
+  if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
+  const headers = ['名稱','類型','所屬主遊戲','系列','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const rows = games.map(g => [
+    g.name,
+    g.gameType === 'expansion' ? '擴充' : '主遊戲',
+    g.gameType === 'expansion' ? (g.baseGameName||'') : '',
+    g.series || '',
+    (g.genres||[]).join('、'),
+    (g.languages||[]).join('、'),
+    g.minPlayers, g.maxPlayers, g.minTime, g.maxTime,
+    g.url || '',
+    g.desc || ''
+  ]);
+  const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const siteName = (titleInput.value || '桌遊資料庫').trim();
+  a.href = url;
+  a.download = `${siteName}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('已下載清單');
+});
+
+/* ---------- Import list from CSV ---------- */
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0; i<text.length; i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if(c === '"'){ inQuotes = true; }
+      else if(c === ','){ row.push(field); field = ''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1] === '\n') i++;
+        row.push(field); field = '';
+        rows.push(row); row = [];
+      } else {
+        field += c;
+      }
+    }
+  }
+  if(field.length > 0 || row.length > 0){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(cell => cell.trim() !== ''));
+}
+
+importBtn.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以匯入清單'); return; }
+  importFileInput.value = '';
+  importFileInput.click();
+});
+
+importFileInput.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!isOwner){ showToast('只有管理者可以匯入清單'); return; }
+
+  const text = await file.text();
+  const rows = parseCSV(text);
+  if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
+
+  // 依下載清單的欄位順序解析：
+  // 名稱,類型,所屬主遊戲,系列,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  const dataRows = rows.slice(1);
+  let successCount = 0, skipCount = 0;
+  importBtn.disabled = true;
+  const originalLabel = importBtn.innerHTML;
+  importBtn.innerHTML = '匯入中…';
+
+  for(const r of dataRows){
+    const [name, typeLabel, baseGameName, series, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
+    const trimmedName = (name||'').trim();
+    const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
+    const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
+    if(!trimmedName || isNaN(minPlayers) || isNaN(maxPlayers) || isNaN(minTime) || isNaN(maxTime)){
+      skipCount++; continue;
+    }
+    const gameType = (typeLabel||'').trim() === '擴充' ? 'expansion' : 'base';
+    const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
+    const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
+    const payload = {
+      name: trimmedName, genres, languages, desc: (desc||'').trim(),
+      minPlayers, maxPlayers, minTime, maxTime,
+      gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '',
+      series: (series||'').trim(), url: (url||'').trim(),
+      image: null, createdAt: serverTimestamp()
+    };
+    try{
+      await addDoc(gamesCol, payload);
+      successCount++;
+    }catch(err){
+      console.error(err);
+      skipCount++;
+    }
+  }
+
+  importBtn.disabled = false;
+  importBtn.innerHTML = originalLabel;
+  showToast(`匯入完成：成功 ${successCount} 筆，略過 ${skipCount} 筆`);
 });
