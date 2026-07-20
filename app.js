@@ -28,6 +28,9 @@ let games = [];
 let editingId = null;
 let pendingImageData = null;
 let titleSyncing = false;
+let currentPage = 1;
+let pageSize = 20;
+let genreNotes = {};
 
 const grid = document.getElementById('grid');
 const emptyEl = document.getElementById('empty');
@@ -38,6 +41,7 @@ const form = document.getElementById('game-form');
 const imgInput = document.getElementById('img-input');
 const imgPreview = document.getElementById('img-preview');
 const imgHint = document.getElementById('img-hint');
+const imgRemoveBtn = document.getElementById('img-remove-btn');
 const titleInput = document.getElementById('site-title');
 const filterPlayersGroup = document.getElementById('filter-players-group');
 const filterLangGroup = document.getElementById('filter-lang-group');
@@ -47,6 +51,19 @@ const filterYearGroup = document.getElementById('filter-year-group');
 const filterDifficultyGroup = document.getElementById('filter-difficulty-group');
 const filterTypeGroup = document.getElementById('filter-type-group');
 const resultsCountEl = document.getElementById('results-count');
+const homeView = document.getElementById('home-view');
+const libraryView = document.getElementById('library-view');
+const enterLibraryBtn = document.getElementById('enter-library-btn');
+const backHomeBtn = document.getElementById('back-home-btn');
+const recommendContent = document.getElementById('recommend-content');
+const recommendPencil = document.getElementById('recommend-pencil');
+const genreLegendList = document.getElementById('genre-legend-list');
+const pageSizeSelect = document.getElementById('page-size-select');
+const paginationEl = document.getElementById('pagination');
+const imageManagerBtn = document.getElementById('image-manager-btn');
+const imageManagerOverlay = document.getElementById('image-manager-overlay');
+const imageManagerClose = document.getElementById('image-manager-close');
+const imageManagerList = document.getElementById('image-manager-list');
 
 const selectedPlayers = new Set();
 const selectedLangs = new Set();
@@ -122,6 +139,26 @@ function applySort(list, mode){
   const sorted = [...list];
   if(mode === 'name'){
     sorted.sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
+  } else if(mode === 'year-desc'){
+    sorted.sort((a,b)=>{
+      if(!a.year) return 1;
+      if(!b.year) return -1;
+      return b.year - a.year;
+    });
+  } else if(mode === 'year-asc'){
+    sorted.sort((a,b)=>{
+      if(!a.year) return 1;
+      if(!b.year) return -1;
+      return a.year - b.year;
+    });
+  } else if(mode === 'lang'){
+    sorted.sort((a,b)=>{
+      const al = (a.languages && a.languages[0]) || '';
+      const bl = (b.languages && b.languages[0]) || '';
+      if(!al) return 1;
+      if(!bl) return -1;
+      return al.localeCompare(bl, undefined, {sensitivity:'base'});
+    });
   } else {
     sorted.sort((a,b)=> ((b.createdAt&&b.createdAt.seconds)||0) - ((a.createdAt&&a.createdAt.seconds)||0));
   }
@@ -150,6 +187,8 @@ onAuthStateChanged(auth, (user)=>{
   titleInput.readOnly = !isOwner;
   customSubtitleInput.readOnly = !isOwner;
   refreshSubtitleVisibility();
+  refreshRecommendVisibility();
+  renderGenreLegend();
   bannerRemoveBtn.style.display = (isOwner && bannerEl.classList.contains('has-image')) ? 'flex' : 'none';
   if(user){
     userAvatar.src = user.photoURL || '';
@@ -187,6 +226,11 @@ function refreshSubtitleVisibility(){
   box.style.display = (customSubtitleInput.value.trim() || isOwner) ? 'flex' : 'none';
 }
 
+function refreshRecommendVisibility(){
+  const section = recommendContent.closest('.recommend-section');
+  section.style.display = (recommendContent.value.trim() || isOwner) ? 'block' : 'none';
+}
+
 function autoGrowTextarea(el){
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
@@ -202,6 +246,12 @@ onSnapshot(siteMetaRef, (snap)=>{
       customSubtitleInput.value = data.subtitle || '';
       autoGrowTextarea(customSubtitleInput);
     }
+    if(document.activeElement !== recommendContent){
+      recommendContent.value = data.recommendation || '';
+      autoGrowTextarea(recommendContent);
+    }
+    genreNotes = data.genreNotes || {};
+    renderGenreLegend();
     if(data.headerImage){
       bannerImg.src = data.headerImage;
       bannerImg.style.display = 'block';
@@ -213,6 +263,7 @@ onSnapshot(siteMetaRef, (snap)=>{
       bannerRemoveBtn.style.display = 'none';
     }
     refreshSubtitleVisibility();
+    refreshRecommendVisibility();
   }
 }, (err)=>{
   console.error(err);
@@ -228,6 +279,7 @@ onSnapshot(gamesCol, (snap)=>{
   updateGenreFilterOptions();
   updateSeriesFilterOptions();
   updateYearFilterOptions();
+  renderGenreLegend();
   renderGrid();
 }, (err)=>{
   console.error(err);
@@ -249,6 +301,22 @@ async function saveSubtitle(val){
     await setDoc(siteMetaRef, { subtitle: val }, { merge: true });
   }catch(e){
     showToast('副標儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveRecommendation(val){
+  try{
+    await setDoc(siteMetaRef, { recommendation: val }, { merge: true });
+  }catch(e){
+    showToast('推薦內容儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveGenreNotes(){
+  try{
+    await setDoc(siteMetaRef, { genreNotes }, { merge: true });
+  }catch(e){
+    showToast('類型說明儲存失敗，請確認網路連線與 Firebase 設定');
   }
 }
 
@@ -302,6 +370,40 @@ function updateYearFilterOptions(){
   games.forEach(g => { if(g.year) years.add(g.year); });
   renderCheckboxGroup(filterYearGroup, [...years].sort((a,b)=>b-a), selectedYears, '尚無年份資料');
 }
+
+function renderGenreLegend(){
+  const genreSet = new Set();
+  games.forEach(g => (g.genres||[]).forEach(t => genreSet.add(t)));
+  const genres = [...genreSet].sort();
+  if(genres.length === 0){
+    genreLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何類型標籤 — 新增桌遊時填寫「類型」欄位後，會自動列在這裡。</div>`;
+    return;
+  }
+  genreLegendList.innerHTML = genres.map(t=>{
+    const note = (genreNotes[t] || '').trim();
+    const noteHtml = note ? escapeHtml(note) : (isOwner ? '點選鉛筆新增說明' : '尚無說明');
+    const pencil = isOwner
+      ? `<svg class="genre-note-pencil" data-genre="${escapeHtml(t)}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
+      : '';
+    return `
+    <div class="genre-legend-item">
+      <span class="tag">${escapeHtml(t)}</span>
+      <span class="genre-note-text ${note ? '' : 'empty'}">${noteHtml}</span>
+      ${pencil}
+    </div>`;
+  }).join('');
+}
+genreLegendList.addEventListener('click', (e)=>{
+  const pencil = e.target.closest('.genre-note-pencil');
+  if(!pencil || !isOwner) return;
+  const genre = pencil.dataset.genre;
+  const current = genreNotes[genre] || '';
+  const val = prompt(`請輸入「${genre}」的簡介說明：`, current);
+  if(val === null) return;
+  genreNotes[genre] = val.trim();
+  saveGenreNotes();
+  renderGenreLegend();
+});
 
 function renderCard(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
@@ -409,12 +511,49 @@ function renderGrid(){
     emptyEl.textContent = games.length === 0
       ? '尚未收錄任何桌遊 — 點選「新增桌遊」開始建立共用收藏'
       : '找不到符合條件的桌遊';
+    paginationEl.innerHTML = '';
   } else {
     grid.style.display = 'grid';
     emptyEl.style.display = 'none';
-    grid.innerHTML = list.map(renderCard).join('');
+    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+    if(currentPage > totalPages) currentPage = totalPages;
+    if(currentPage < 1) currentPage = 1;
+    const pageList = list.slice((currentPage-1)*pageSize, currentPage*pageSize);
+    grid.innerHTML = pageList.map(renderCard).join('');
+    renderPagination(totalPages);
   }
 }
+
+function goToPage(n){
+  currentPage = n;
+  renderGrid();
+  document.getElementById('library-view').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderPagination(totalPages){
+  if(totalPages <= 1){ paginationEl.innerHTML = ''; return; }
+  let html = `<button class="page-btn" data-page="${currentPage-1}" ${currentPage<=1?'disabled':''}>‹</button>`;
+  for(let i=1; i<=totalPages; i++){
+    if(i===1 || i===totalPages || Math.abs(i-currentPage)<=1){
+      html += `<button class="page-btn ${i===currentPage?'active':''}" data-page="${i}">${i}</button>`;
+    } else if(i === currentPage-2 || i === currentPage+2){
+      html += `<span class="page-btn page-ellipsis">…</span>`;
+    }
+  }
+  html += `<button class="page-btn" data-page="${currentPage+1}" ${currentPage>=totalPages?'disabled':''}>›</button>`;
+  paginationEl.innerHTML = html;
+}
+paginationEl.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button.page-btn');
+  if(!btn || btn.disabled) return;
+  const page = parseInt(btn.dataset.page, 10);
+  if(!isNaN(page)) goToPage(page);
+});
+pageSizeSelect.addEventListener('change', ()=>{
+  pageSize = parseInt(pageSizeSelect.value, 10);
+  currentPage = 1;
+  renderGrid();
+});
 
 /* ---------- Modal ---------- */
 function openModal(mode, game){
@@ -441,8 +580,10 @@ function openModal(mode, game){
   pendingImageData = game ? (game.image || null) : null;
   if(pendingImageData){
     imgPreview.src = pendingImageData; imgPreview.style.display='block'; imgHint.textContent='點擊更換圖片';
+    imgRemoveBtn.style.display = 'inline-block';
   } else {
     imgPreview.style.display='none'; imgHint.textContent='點擊或拖曳圖片到此處上傳';
+    imgRemoveBtn.style.display = 'none';
   }
   overlay.classList.add('show');
 }
@@ -451,6 +592,7 @@ function closeModal(){
   form.reset();
   imgPreview.style.display='none';
   imgHint.textContent='點擊或拖曳圖片到此處上傳';
+  imgRemoveBtn.style.display = 'none';
   pendingImageData = null;
   editingId = null;
   baseGameField.style.display = 'none';
@@ -471,29 +613,48 @@ document.querySelectorAll('input[name="f-type"]').forEach(radio=>{
 });
 
 /* image resize + compress (Firestore 單一文件上限 1MB，圖片壓縮到安全範圍內) */
-function handleImageFile(file){
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = (e)=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const maxDim = 560;
-      let w = img.width, h = img.height;
-      if(w > h && w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; }
-      else if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      pendingImageData = canvas.toDataURL('image/jpeg', 0.68);
-      imgPreview.src = pendingImageData;
-      imgPreview.style.display = 'block';
-      imgHint.textContent = '點擊更換圖片';
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; }
+        else if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
     };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleImageFile(file){
+  if(!file) return;
+  pendingImageData = await compressImage(file, 560, 0.68);
+  imgPreview.src = pendingImageData;
+  imgPreview.style.display = 'block';
+  imgHint.textContent = '點擊更換圖片';
+  imgRemoveBtn.style.display = 'inline-block';
 }
 imgInput.addEventListener('change', (e)=> handleImageFile(e.target.files[0]));
+
+imgRemoveBtn.addEventListener('click', ()=>{
+  if(!pendingImageData) return;
+  if(!confirm('確定要移除這張圖片嗎？')) return;
+  pendingImageData = null;
+  imgInput.value = '';
+  imgPreview.src = '';
+  imgPreview.style.display = 'none';
+  imgHint.textContent = '點擊或拖曳圖片到此處上傳';
+  imgRemoveBtn.style.display = 'none';
+});
 
 /* form submit */
 form.addEventListener('submit', async (e)=>{
@@ -616,7 +777,7 @@ grid.addEventListener('click', async (e)=>{
       selectedSeries.add(value);
       updateSeriesFilterOptions();
     }
-    renderGrid();
+    onFilterChanged();
     showToast(`已套用篩選：${value}`);
     window.scrollTo({top:0, behavior:'smooth'});
     return;
@@ -651,15 +812,19 @@ grid.addEventListener('click', async (e)=>{
 });
 
 /* search + filter */
-document.getElementById('search-input').addEventListener('input', renderGrid);
-sortSelect.addEventListener('change', renderGrid);
+function onFilterChanged(){
+  currentPage = 1;
+  renderGrid();
+}
+document.getElementById('search-input').addEventListener('input', onFilterChanged);
+sortSelect.addEventListener('change', onFilterChanged);
 
 function wireCheckboxGroup(container, targetSet){
   container.addEventListener('change', (e)=>{
     if(e.target.type !== 'checkbox') return;
     const val = e.target.value;
     if(e.target.checked){ targetSet.add(val); } else { targetSet.delete(val); }
-    renderGrid();
+    onFilterChanged();
   });
 }
 wireCheckboxGroup(filterPlayersGroup, selectedPlayers);
@@ -680,7 +845,7 @@ resetFiltersBtn.addEventListener('click', ()=>{
   selectedYears.clear();
   selectedDifficulties.clear();
   filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-  renderGrid();
+  onFilterChanged();
   filterPanel.classList.remove('show');
 });
 
@@ -710,6 +875,33 @@ customSubtitleInput.addEventListener('blur', ()=>{
 subtitlePencil.addEventListener('click', ()=>{
   if(!isOwner){ showToast('只有管理者可以修改副標'); return; }
   customSubtitleInput.focus();
+});
+
+/* recommendation content editing */
+recommendContent.addEventListener('input', ()=> autoGrowTextarea(recommendContent));
+recommendContent.addEventListener('blur', ()=>{
+  if(!isOwner) return;
+  const val = recommendContent.value.trim();
+  recommendContent.value = val;
+  autoGrowTextarea(recommendContent);
+  saveRecommendation(val);
+  refreshRecommendVisibility();
+});
+recommendPencil.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以修改推薦內容'); return; }
+  recommendContent.focus();
+});
+
+/* home / library view switching */
+enterLibraryBtn.addEventListener('click', ()=>{
+  homeView.style.display = 'none';
+  libraryView.style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+backHomeBtn.addEventListener('click', ()=>{
+  libraryView.style.display = 'none';
+  homeView.style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
 });
 
 /* banner image upload / remove */
@@ -770,6 +962,77 @@ document.addEventListener('click', (e)=>{
   }
   if(!e.target.closest('.list-dropdown')){
     listPanel.classList.remove('show');
+  }
+});
+
+/* ---------- Batch image manager ---------- */
+function renderImageManagerList(){
+  if(games.length === 0){
+    imageManagerList.innerHTML = `<div class="genre-legend-empty">目前還沒有任何桌遊。</div>`;
+    return;
+  }
+  const sorted = [...games].sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
+  imageManagerList.innerHTML = sorted.map(g => `
+    <div class="image-manager-row" data-id="${g.id}">
+      <div class="image-manager-thumb">
+        ${g.image ? `<img src="${g.image}" alt="">` : `<span class="placeholder-icon">無圖片</span>`}
+      </div>
+      <div class="image-manager-name">${escapeHtml(g.name)}</div>
+      <div class="image-manager-actions">
+        <button type="button" class="img-upload-btn" data-id="${g.id}">上傳</button>
+        <input type="file" accept="image/*" class="img-manager-file-input" data-id="${g.id}" style="display:none;">
+        <button type="button" class="img-remove-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>移除</button>
+      </div>
+    </div>`).join('');
+}
+
+imageManagerBtn.addEventListener('click', ()=>{
+  listPanel.classList.remove('show');
+  if(!isOwner){ showToast('只有管理者可以管理圖片'); return; }
+  renderImageManagerList();
+  imageManagerOverlay.classList.add('show');
+});
+imageManagerClose.addEventListener('click', ()=> imageManagerOverlay.classList.remove('show'));
+imageManagerOverlay.addEventListener('click', (e)=>{ if(e.target === imageManagerOverlay) imageManagerOverlay.classList.remove('show'); });
+
+imageManagerList.addEventListener('click', (e)=>{
+  const uploadBtn = e.target.closest('.img-upload-btn');
+  if(uploadBtn){
+    const fileInput = uploadBtn.closest('.image-manager-row').querySelector('.img-manager-file-input');
+    fileInput.click();
+    return;
+  }
+  const removeBtn = e.target.closest('.img-remove-row-btn');
+  if(removeBtn && !removeBtn.disabled){
+    const id = removeBtn.dataset.id;
+    const g = games.find(x=>x.id===id);
+    if(!g) return;
+    if(!confirm(`確定要移除「${g.name}」的圖片嗎？`)) return;
+    updateDoc(doc(db, 'games', id), { image: null })
+      .then(()=>{
+        showToast('已移除圖片');
+        renderImageManagerList();
+      })
+      .catch(()=> showToast('移除失敗，請稍後再試'));
+  }
+});
+
+imageManagerList.addEventListener('change', async (e)=>{
+  const fileInput = e.target.closest('.img-manager-file-input');
+  if(!fileInput) return;
+  const file = fileInput.files[0];
+  if(!file) return;
+  const id = fileInput.dataset.id;
+  const g = games.find(x=>x.id===id);
+  if(!g) return;
+  try{
+    const dataUrl = await compressImage(file, 560, 0.68);
+    await updateDoc(doc(db, 'games', id), { image: dataUrl });
+    showToast(`已更新「${g.name}」的圖片`);
+    renderImageManagerList();
+  }catch(err){
+    console.error(err);
+    showToast('上傳失敗，請稍後再試');
   }
 });
 
