@@ -357,8 +357,10 @@ function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter
   if(count > 0){
     filterBadge.textContent = count;
     filterBadge.style.display = 'flex';
+    resetFiltersBtn.style.display = 'flex';
   } else {
     filterBadge.style.display = 'none';
+    resetFiltersBtn.style.display = 'none';
   }
 }
 
