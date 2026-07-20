@@ -124,6 +124,7 @@ body.is-logged-in .user-chip{display:flex;}
 .rule{height:3px;background:repeating-linear-gradient(90deg,var(--text-on-bg) 0 14px, transparent 14px 20px);opacity:0.16;margin:18px 0 26px;}
 
 .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:26px;}
+.toolbar-break{flex-basis:100%;width:0;height:0;margin:0;}
 .search-box{flex:1 1 240px;position:relative;}
 .search-box input{
   width:100%;padding:12px 14px 12px 40px;border-radius:10px;border:1.5px solid var(--line);
