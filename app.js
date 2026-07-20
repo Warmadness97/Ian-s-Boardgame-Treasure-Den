@@ -296,10 +296,10 @@ function updateYearFilterOptions(){
 function renderCard(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
-  const genreTags = (g.genres||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+  const genreTags = (g.genres||[]).map(t=>`<span class="tag filter-tag" data-filter="genre" data-value="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
   const langTags = (g.languages||[]).map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join('');
   const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
-  const seriesTag = g.series ? `<span class="tag-series">${escapeHtml(g.series)} 系列</span>` : '';
+  const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${escapeHtml(g.series)} 系列</span>` : '';
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
     ? `<div class="base-game-note">→ 擴充自「${escapeHtml(g.baseGameName)}」</div>` : '';
   const imgHtml = g.image
@@ -604,6 +604,22 @@ detailOverlay.addEventListener('click', (e)=>{ if(e.target === detailOverlay) cl
 
 /* grid actions: click card to view details, edit / delete for owner */
 grid.addEventListener('click', async (e)=>{
+  const filterTagEl = e.target.closest('.filter-tag');
+  if(filterTagEl){
+    e.stopPropagation();
+    const type = filterTagEl.dataset.filter;
+    const value = filterTagEl.dataset.value;
+    if(type === 'genre'){
+      genreFilterSelect.value = value;
+    } else if(type === 'series'){
+      seriesFilterSelect.value = value;
+    }
+    renderGrid();
+    showToast(`已套用篩選：${value}`);
+    window.scrollTo({top:0, behavior:'smooth'});
+    return;
+  }
+
   const btn = e.target.closest('button[data-action]');
   const card = e.target.closest('.card');
   if(!card) return;
