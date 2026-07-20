@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
 
@@ -67,6 +67,11 @@
       進入遊戲庫
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
+
+    <div class="genre-legend-section">
+      <h2>遊戲系列介紹</h2>
+      <div class="genre-legend-list" id="series-legend-list"></div>
+    </div>
 
     <div class="genre-legend-section">
       <h2>桌遊類型介紹</h2>
@@ -339,11 +344,46 @@
   <div class="modal image-manager-modal">
     <button class="detail-close" id="image-manager-close">✕</button>
     <h2>批次圖片管理</h2>
-    <p class="image-manager-hint">點「上傳」可更換圖片（會自動壓縮），點「移除」可清除該桌遊的圖片。</p>
+    <p class="image-manager-hint">點「上傳」可更換圖片（會自動壓縮），點「下載」可存下單張圖片，點「移除」可清除該桌遊的圖片；也可以勾選多筆進行批次下載或移除。</p>
+    <div class="image-manager-toolbar">
+      <label class="checkbox-option"><input type="checkbox" id="image-manager-select-all"> 全選</label>
+      <div class="image-manager-batch-actions">
+        <button type="button" class="img-batch-btn" id="image-manager-download-selected" disabled>下載已選取</button>
+        <button type="button" class="img-batch-btn danger" id="image-manager-remove-selected" disabled>移除已選取</button>
+      </div>
+    </div>
     <div class="image-manager-list" id="image-manager-list"></div>
   </div>
 </div>
 
-<script type="module" src="app.js?v=14"></script>
+<div class="overlay" id="daily-pick-manager-overlay">
+  <div class="modal image-manager-modal">
+    <button class="detail-close" id="daily-pick-manager-close">✕</button>
+    <h2>管理今日推薦</h2>
+    <p class="image-manager-hint">預設會依日期自動輪替一款桌遊，你也可以指定固定顯示某一款，之後要改回自動輪替也可以隨時切換。</p>
+    <div class="field">
+      <label>選擇要顯示的桌遊</label>
+      <select id="daily-pick-select">
+        <option value="">自動（依日期輪替）</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="daily-pick-manager-close-btn">取消</button>
+      <button type="button" class="btn-primary" id="daily-pick-apply-btn">套用</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="series-cover-overlay">
+  <div class="modal image-manager-modal">
+    <button class="detail-close" id="series-cover-close">✕</button>
+    <h2 id="series-cover-title">選擇系列封面</h2>
+    <p class="image-manager-hint">選擇要作為此系列封面顯示在遊戲庫的桌遊。</p>
+    <div class="image-manager-list" id="series-cover-list"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module" src="app.js?v=15"></script>
 </body>
 </html>

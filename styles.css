@@ -553,11 +553,24 @@ body.is-logged-in .user-chip{display:flex;}
 /* ---------- Batch image manager ---------- */
 .image-manager-modal{max-width:560px;position:relative;}
 .image-manager-hint{font-size:13px;color:var(--ink-soft);margin:-8px 0 16px;}
+.image-manager-toolbar{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);
+}
+.image-manager-batch-actions{display:flex;gap:8px;}
+.img-batch-btn{
+  padding:8px 14px;border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;
+  border:1.5px solid var(--line);background:#fff;color:var(--ink);
+}
+.img-batch-btn:hover:not(:disabled){border-color:var(--accent-mustard);color:var(--accent-mustard-dark);}
+.img-batch-btn.danger:hover:not(:disabled){border-color:var(--accent-brick);color:var(--accent-brick);}
+.img-batch-btn:disabled{opacity:0.4;cursor:not-allowed;}
 .image-manager-list{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;}
 .image-manager-row{
   display:flex;align-items:center;gap:12px;
   border:1px solid var(--line);border-radius:10px;padding:9px;
 }
+.img-row-select{flex-shrink:0;cursor:pointer;accent-color:var(--accent-mustard-dark);}
 .image-manager-thumb{
   width:52px;height:52px;border-radius:8px;overflow:hidden;flex-shrink:0;
   background:var(--surface-2);display:flex;align-items:center;justify-content:center;
@@ -565,11 +578,42 @@ body.is-logged-in .user-chip{display:flex;}
 .image-manager-thumb img{width:100%;height:100%;object-fit:cover;}
 .image-manager-thumb .placeholder-icon{color:var(--ink-soft);font-size:10px;font-family:'IBM Plex Mono',monospace;}
 .image-manager-name{flex:1;font-size:13.5px;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.image-manager-actions{display:flex;gap:6px;flex-shrink:0;}
-.img-upload-btn, .img-remove-row-btn{
+.image-manager-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.img-upload-btn, .img-remove-row-btn, .img-download-row-btn, .series-cover-pick-btn{
   padding:7px 12px;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;
   border:1.5px solid var(--line);background:#fff;color:var(--ink);
 }
 .img-upload-btn:hover{border-color:var(--accent-mustard);color:var(--accent-mustard-dark);}
+.img-download-row-btn:hover:not(:disabled){border-color:var(--accent-lang);color:var(--accent-lang);}
+.img-download-row-btn:disabled{opacity:0.4;cursor:not-allowed;}
 .img-remove-row-btn:hover:not(:disabled){border-color:var(--accent-brick);color:var(--accent-brick);}
 .img-remove-row-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.series-cover-pick-btn:hover{border-color:var(--accent-mustard);color:var(--accent-mustard-dark);}
+.series-cover-pick-btn.current{background:var(--accent-mustard);border-color:var(--accent-mustard);color:var(--ink);cursor:default;}
+
+/* ---------- Daily pick manager ---------- */
+.daily-pick-label-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.daily-pick-manage-btn{
+  background:transparent;border:1.5px solid rgba(243,234,211,0.3);color:var(--text-on-bg-soft);
+  padding:6px 12px;border-radius:8px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;
+}
+.daily-pick-manage-btn:hover{color:var(--text-on-bg);border-color:var(--text-on-bg);}
+#daily-pick-select{
+  width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--line);background:#fff;
+  font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--ink);cursor:pointer;
+}
+#daily-pick-select:focus{outline:none;border-color:var(--accent-mustard);}
+
+/* ---------- Series stack cards ---------- */
+.stack-wrapper{position:relative;margin-bottom:6px;}
+.stack-layer{
+  position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+}
+.stack-layer.layer-b{transform:translate(7px,11px) rotate(1.4deg);z-index:0;opacity:0.5;}
+.stack-layer.layer-a{transform:translate(3.5px,5.5px) rotate(0.7deg);z-index:1;opacity:0.8;}
+.stack-wrapper .stack-card{position:relative;z-index:2;}
+.stack-cover-btn{
+  background:transparent;border:1.5px solid var(--line);color:var(--ink-soft);
+  padding:6px 10px;border-radius:7px;font-size:11.5px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;
+}
+.stack-cover-btn:hover{border-color:var(--accent-mustard);color:var(--accent-mustard-dark);}

@@ -31,6 +31,10 @@ let titleSyncing = false;
 let currentPage = 1;
 let pageSize = 20;
 let genreNotes = {};
+let seriesNotes = {};
+let featuredGameId = null;
+let seriesCovers = {};
+const selectedImageIds = new Set();
 
 const grid = document.getElementById('grid');
 const emptyEl = document.getElementById('empty');
@@ -65,6 +69,19 @@ const imageManagerBtn = document.getElementById('image-manager-btn');
 const imageManagerOverlay = document.getElementById('image-manager-overlay');
 const imageManagerClose = document.getElementById('image-manager-close');
 const imageManagerList = document.getElementById('image-manager-list');
+const imageManagerSelectAll = document.getElementById('image-manager-select-all');
+const imageManagerDownloadSelectedBtn = document.getElementById('image-manager-download-selected');
+const imageManagerRemoveSelectedBtn = document.getElementById('image-manager-remove-selected');
+const seriesLegendList = document.getElementById('series-legend-list');
+const dailyPickManagerOverlay = document.getElementById('daily-pick-manager-overlay');
+const dailyPickManagerClose = document.getElementById('daily-pick-manager-close');
+const dailyPickManagerCloseBtn = document.getElementById('daily-pick-manager-close-btn');
+const dailyPickSelect = document.getElementById('daily-pick-select');
+const dailyPickApplyBtn = document.getElementById('daily-pick-apply-btn');
+const seriesCoverOverlay = document.getElementById('series-cover-overlay');
+const seriesCoverClose = document.getElementById('series-cover-close');
+const seriesCoverList = document.getElementById('series-cover-list');
+const seriesCoverTitle = document.getElementById('series-cover-title');
 
 const selectedPlayers = new Set();
 const selectedLangs = new Set();
@@ -194,6 +211,7 @@ onAuthStateChanged(auth, (user)=>{
   refreshSubtitleVisibility();
   refreshRecommendVisibility();
   renderGenreLegend();
+  renderSeriesLegend();
   bannerRemoveBtn.style.display = (isOwner && bannerEl.classList.contains('has-image')) ? 'flex' : 'none';
   if(user){
     userAvatar.src = user.photoURL || '';
@@ -256,7 +274,13 @@ onSnapshot(siteMetaRef, (snap)=>{
       autoGrowTextarea(recommendContent);
     }
     genreNotes = data.genreNotes || {};
+    seriesNotes = data.seriesNotes || {};
+    seriesCovers = data.seriesCovers || {};
+    featuredGameId = data.featuredGameId || null;
     renderGenreLegend();
+    renderSeriesLegend();
+    renderDailyPick();
+    renderGrid();
     if(data.headerImage){
       bannerImg.src = data.headerImage;
       bannerImg.style.display = 'block';
@@ -285,6 +309,7 @@ onSnapshot(gamesCol, (snap)=>{
   updateSeriesFilterOptions();
   updateYearFilterOptions();
   renderGenreLegend();
+  renderSeriesLegend();
   renderDailyPick();
   renderGrid();
 }, (err)=>{
@@ -323,6 +348,30 @@ async function saveGenreNotes(){
     await setDoc(siteMetaRef, { genreNotes }, { merge: true });
   }catch(e){
     showToast('類型說明儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveSeriesNotes(){
+  try{
+    await setDoc(siteMetaRef, { seriesNotes }, { merge: true });
+  }catch(e){
+    showToast('系列說明儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveFeaturedGameId(id){
+  try{
+    await setDoc(siteMetaRef, { featuredGameId: id }, { merge: true });
+  }catch(e){
+    showToast('今日推薦設定失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+
+async function saveSeriesCovers(){
+  try{
+    await setDoc(siteMetaRef, { seriesCovers }, { merge: true });
+  }catch(e){
+    showToast('系列封面設定失敗，請確認網路連線與 Firebase 設定');
   }
 }
 
@@ -403,9 +452,80 @@ function renderGenreLegend(){
   }).join('');
 }
 
+function renderSeriesLegend(){
+  const seriesCounts = new Map();
+  games.forEach(g => { if(g.series) seriesCounts.set(g.series, (seriesCounts.get(g.series)||0) + 1); });
+  const seriesNames = [...seriesCounts.keys()].sort();
+  if(seriesNames.length === 0){
+    seriesLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何系列 — 新增桌遊時填寫「系列」欄位後，會自動列在這裡。</div>`;
+    return;
+  }
+  seriesLegendList.innerHTML = seriesNames.map(s=>{
+    const note = (seriesNotes[s] || '').trim();
+    const noteHtml = note ? escapeHtml(note) : (isOwner ? '點選鉛筆新增說明' : '尚無說明');
+    const pencil = isOwner
+      ? `<svg class="series-note-pencil" data-series="${escapeHtml(s)}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
+      : '';
+    return `
+    <div class="genre-legend-item" data-series="${escapeHtml(s)}">
+      <div class="genre-legend-head">
+        <span class="tag-series">${escapeHtml(s)}</span>
+        <span class="genre-legend-count">${seriesCounts.get(s)} 款</span>
+        ${pencil}
+      </div>
+      <span class="genre-note-text ${note ? '' : 'empty'}">${noteHtml}</span>
+    </div>`;
+  }).join('');
+}
+seriesLegendList.addEventListener('click', (e)=>{
+  const pencil = e.target.closest('.series-note-pencil');
+  if(pencil){
+    if(!isOwner) return;
+    const series = pencil.dataset.series;
+    const current = seriesNotes[series] || '';
+    const val = prompt(`請輸入「${series}」系列的簡介說明：`, current);
+    if(val === null) return;
+    seriesNotes[series] = val.trim();
+    saveSeriesNotes();
+    renderSeriesLegend();
+    return;
+  }
+  const card = e.target.closest('.genre-legend-item');
+  if(card){
+    filterBySeriesFromHome(card.dataset.series);
+  }
+});
+
+function filterBySeriesFromHome(series){
+  selectedPlayers.clear();
+  selectedLangs.clear();
+  selectedTypes.clear();
+  selectedGenres.clear();
+  selectedSeries.clear();
+  selectedSeries.add(series);
+  selectedYears.clear();
+  selectedDifficulties.clear();
+  document.getElementById('search-input').value = '';
+  updateLangFilterOptions();
+  updateGenreFilterOptions();
+  updateSeriesFilterOptions();
+  updateYearFilterOptions();
+  document.querySelectorAll('#filter-players-group input, #filter-difficulty-group input, #filter-type-group input')
+    .forEach(cb => cb.checked = false);
+  currentPage = 1;
+  homeView.style.display = 'none';
+  libraryView.style.display = 'block';
+  renderGrid();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
 /* ---------- Daily pick (今日推薦) ---------- */
 function getDailyPick(){
   if(games.length === 0) return null;
+  if(featuredGameId){
+    const picked = games.find(g => g.id === featuredGameId);
+    if(picked) return picked;
+  }
   const sorted = [...games].sort((a,b)=> (a.id||'').localeCompare(b.id||''));
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
@@ -418,13 +538,18 @@ function renderDailyPick(){
   const pick = getDailyPick();
   if(!pick){ dailyPickSection.innerHTML = ''; return; }
   const now = new Date();
-  const dateLabel = `${now.getMonth()+1} 月 ${now.getDate()} 日．今日推薦`;
+  const isFeatured = !!(featuredGameId && pick.id === featuredGameId);
+  const dateLabel = isFeatured ? '📌 管理者指定推薦' : `📅 ${now.getMonth()+1} 月 ${now.getDate()} 日．今日推薦`;
+  const manageBtn = isOwner ? `<button type="button" class="daily-pick-manage-btn" id="daily-pick-manage-btn">管理</button>` : '';
   const genreTags = (pick.genres||[]).slice(0,3).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
   const imgHtml = pick.image
     ? `<img src="${pick.image}" alt="${escapeHtml(pick.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
   dailyPickSection.innerHTML = `
-    <div class="daily-pick-label">📅 ${dateLabel}</div>
+    <div class="daily-pick-label-row">
+      <div class="daily-pick-label">${dateLabel}</div>
+      ${manageBtn}
+    </div>
     <div class="daily-pick-card" data-id="${pick.id}">
       <div class="daily-pick-img">${imgHtml}</div>
       <div class="daily-pick-body">
@@ -438,11 +563,37 @@ function renderDailyPick(){
     </div>`;
 }
 dailyPickSection.addEventListener('click', (e)=>{
+  const manageBtn = e.target.closest('#daily-pick-manage-btn');
+  if(manageBtn){
+    if(!isOwner) return;
+    populateDailyPickSelect();
+    dailyPickManagerOverlay.classList.add('show');
+    return;
+  }
   const card = e.target.closest('.daily-pick-card');
   if(!card) return;
   const g = games.find(x => x.id === card.dataset.id);
   if(g) openDetailModal(g);
 });
+
+function populateDailyPickSelect(){
+  const sortedGames = [...games].sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
+  dailyPickSelect.innerHTML = '<option value="">自動（依日期輪替）</option>' +
+    sortedGames.map(g => `<option value="${g.id}" ${g.id===featuredGameId?'selected':''}>${escapeHtml(g.name)}</option>`).join('');
+}
+dailyPickManagerClose.addEventListener('click', ()=> dailyPickManagerOverlay.classList.remove('show'));
+dailyPickManagerCloseBtn.addEventListener('click', ()=> dailyPickManagerOverlay.classList.remove('show'));
+dailyPickManagerOverlay.addEventListener('click', (e)=>{ if(e.target === dailyPickManagerOverlay) dailyPickManagerOverlay.classList.remove('show'); });
+dailyPickApplyBtn.addEventListener('click', async ()=>{
+  if(!isOwner) return;
+  const val = dailyPickSelect.value || null;
+  featuredGameId = val;
+  await saveFeaturedGameId(val);
+  renderDailyPick();
+  dailyPickManagerOverlay.classList.remove('show');
+  showToast(val ? '已指定今日推薦桌遊' : '已改回自動每日輪替');
+});
+
 genreLegendList.addEventListener('click', (e)=>{
   const pencil = e.target.closest('.genre-note-pencil');
   if(pencil){
@@ -485,7 +636,7 @@ function filterByGenreFromHome(genre){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function renderCard(g){
+function renderCard(g, stackInfo){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
   const genreTags = (g.genres||[]).map(t=>`<span class="tag filter-tag" data-filter="genre" data-value="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
@@ -501,7 +652,8 @@ function renderCard(g){
     </div>`;
   }
   const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
-  const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${escapeHtml(g.series)} 系列</span>` : '';
+  const seriesLabel = stackInfo ? `${escapeHtml(g.series)} 系列 · 共 ${stackInfo.count} 款` : (g.series ? `${escapeHtml(g.series)} 系列` : '');
+  const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${seriesLabel}</span>` : '';
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
     ? `<div class="base-game-note">→ 擴充自「${escapeHtml(g.baseGameName)}」</div>` : '';
   const imgHtml = g.image
@@ -510,8 +662,8 @@ function renderCard(g){
   const cornerBadges = (expansionTag || seriesTag || langHtml)
     ? `<div class="card-img-badges">${expansionTag}${seriesTag}${langHtml}</div>` : '';
   const newBadge = isNewGame(g) ? `<div class="card-new-badge">新發現！</div>` : '';
-  return `
-  <div class="card" data-id="${g.id}">
+  const cardHtml = `
+  <div class="card${stackInfo ? ' stack-card' : ''}" data-id="${g.id}">
     <div class="card-img">${imgHtml}${cornerBadges}${newBadge}</div>
     <div class="card-body">
       <div class="card-name">${escapeHtml(g.name)}</div>
@@ -529,8 +681,16 @@ function renderCard(g){
       <div class="card-actions">
         <button class="edit-btn" data-action="edit" data-id="${g.id}">${EDIT_ICON} 編輯</button>
         <button class="del-btn" data-action="delete" data-id="${g.id}">${TRASH_ICON} 刪除</button>
+        ${stackInfo ? `<button type="button" class="stack-cover-btn" data-series="${escapeHtml(g.series)}">選擇封面</button>` : ''}
       </div>` : ''}
     </div>
+  </div>`;
+  if(!stackInfo) return cardHtml;
+  return `
+  <div class="stack-wrapper">
+    <div class="stack-layer layer-b"></div>
+    <div class="stack-layer layer-a"></div>
+    ${cardHtml}
   </div>`;
 }
 
@@ -614,13 +774,57 @@ function renderGrid(){
   } else {
     grid.style.display = 'grid';
     emptyEl.style.display = 'none';
-    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+    const displayList = buildDisplayList(list);
+    const totalPages = Math.max(1, Math.ceil(displayList.length / pageSize));
     if(currentPage > totalPages) currentPage = totalPages;
     if(currentPage < 1) currentPage = 1;
-    const pageList = list.slice((currentPage-1)*pageSize, currentPage*pageSize);
-    grid.innerHTML = pageList.map(renderCard).join('');
+    const pageItems = displayList.slice((currentPage-1)*pageSize, currentPage*pageSize);
+    grid.innerHTML = pageItems.map(item =>
+      item.type === 'stack' ? renderCard(item.cover, {count: item.games.length}) : renderCard(item.game)
+    ).join('');
     renderPagination(totalPages);
   }
+}
+
+function getSeriesCover(seriesGames, seriesName){
+  const pickedId = seriesCovers[seriesName];
+  if(pickedId){
+    const picked = seriesGames.find(x => x.id === pickedId);
+    if(picked) return picked;
+  }
+  const baseGames = seriesGames.filter(g => g.gameType !== 'expansion');
+  const pool = baseGames.length > 0 ? baseGames : seriesGames;
+  return [...pool].sort((a,b)=> ((a.createdAt&&a.createdAt.seconds)||0) - ((b.createdAt&&b.createdAt.seconds)||0))[0];
+}
+
+function buildDisplayList(list){
+  if(selectedSeries.size > 0){
+    return list.map(g => ({type:'single', game: g}));
+  }
+  const seriesMap = new Map();
+  list.forEach(g=>{
+    if(g.series){
+      if(!seriesMap.has(g.series)) seriesMap.set(g.series, []);
+      seriesMap.get(g.series).push(g);
+    }
+  });
+  const seen = new Set();
+  const result = [];
+  list.forEach(g=>{
+    if(g.series){
+      if(seen.has(g.series)) return;
+      seen.add(g.series);
+      const seriesGames = seriesMap.get(g.series);
+      if(seriesGames.length === 1){
+        result.push({type:'single', game: seriesGames[0]});
+      } else {
+        result.push({type:'stack', series: g.series, games: seriesGames, cover: getSeriesCover(seriesGames, g.series)});
+      }
+    } else {
+      result.push({type:'single', game: g});
+    }
+  });
+  return result;
 }
 
 function goToPage(n){
@@ -864,6 +1068,14 @@ detailOverlay.addEventListener('click', (e)=>{ if(e.target === detailOverlay) cl
 
 /* grid actions: click card to view details, edit / delete for owner */
 grid.addEventListener('click', async (e)=>{
+  const coverBtn = e.target.closest('.stack-cover-btn');
+  if(coverBtn){
+    e.stopPropagation();
+    if(!isOwner) return;
+    openSeriesCoverPicker(coverBtn.dataset.series);
+    return;
+  }
+
   const filterTagEl = e.target.closest('.filter-tag');
   if(filterTagEl){
     e.stopPropagation();
@@ -1072,15 +1284,51 @@ document.addEventListener('click', (e)=>{
   }
 });
 
+/* ---------- Series cover picker ---------- */
+function openSeriesCoverPicker(series){
+  const seriesGames = games.filter(g => g.series === series);
+  if(seriesGames.length === 0){ showToast('找不到這個系列的桌遊'); return; }
+  seriesCoverTitle.textContent = `選擇「${series}」系列的封面`;
+  const currentCoverId = getSeriesCover(seriesGames, series).id;
+  seriesCoverList.innerHTML = seriesGames.map(g => `
+    <div class="image-manager-row" data-id="${g.id}">
+      <div class="image-manager-thumb">
+        ${g.image ? `<img src="${g.image}" alt="">` : `<span class="placeholder-icon">無圖片</span>`}
+      </div>
+      <div class="image-manager-name">${escapeHtml(g.name)}${g.gameType === 'expansion' ? '（擴充）' : ''}</div>
+      <div class="image-manager-actions">
+        <button type="button" class="series-cover-pick-btn ${g.id === currentCoverId ? 'current' : ''}" data-id="${g.id}" data-series="${escapeHtml(series)}">
+          ${g.id === currentCoverId ? '目前封面' : '設為封面'}
+        </button>
+      </div>
+    </div>`).join('');
+  seriesCoverOverlay.classList.add('show');
+}
+seriesCoverClose.addEventListener('click', ()=> seriesCoverOverlay.classList.remove('show'));
+seriesCoverOverlay.addEventListener('click', (e)=>{ if(e.target === seriesCoverOverlay) seriesCoverOverlay.classList.remove('show'); });
+seriesCoverList.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.series-cover-pick-btn');
+  if(!btn || btn.classList.contains('current')) return;
+  const series = btn.dataset.series;
+  const id = btn.dataset.id;
+  seriesCovers[series] = id;
+  saveSeriesCovers();
+  seriesCoverOverlay.classList.remove('show');
+  showToast('已更新系列封面');
+  renderGrid();
+});
+
 /* ---------- Batch image manager ---------- */
 function renderImageManagerList(){
   if(games.length === 0){
     imageManagerList.innerHTML = `<div class="genre-legend-empty">目前還沒有任何桌遊。</div>`;
+    updateImageManagerBatchUI();
     return;
   }
   const sorted = [...games].sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
   imageManagerList.innerHTML = sorted.map(g => `
     <div class="image-manager-row" data-id="${g.id}">
+      <input type="checkbox" class="img-row-select" data-id="${g.id}" ${selectedImageIds.has(g.id) ? 'checked' : ''}>
       <div class="image-manager-thumb">
         ${g.image ? `<img src="${g.image}" alt="">` : `<span class="placeholder-icon">無圖片</span>`}
       </div>
@@ -1088,43 +1336,120 @@ function renderImageManagerList(){
       <div class="image-manager-actions">
         <button type="button" class="img-upload-btn" data-id="${g.id}">上傳</button>
         <input type="file" accept="image/*" class="img-manager-file-input" data-id="${g.id}" style="display:none;">
+        <button type="button" class="img-download-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>下載</button>
         <button type="button" class="img-remove-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>移除</button>
       </div>
     </div>`).join('');
+  updateImageManagerBatchUI();
+}
+
+function updateImageManagerBatchUI(){
+  const rowIds = [...games].map(g => g.id);
+  // 清掉已經不存在的桌遊 id（例如剛好被刪除）
+  [...selectedImageIds].forEach(id => { if(!rowIds.includes(id)) selectedImageIds.delete(id); });
+  const count = selectedImageIds.size;
+  imageManagerDownloadSelectedBtn.disabled = count === 0;
+  imageManagerRemoveSelectedBtn.disabled = count === 0;
+  imageManagerDownloadSelectedBtn.textContent = count > 0 ? `下載已選取（${count}）` : '下載已選取';
+  imageManagerRemoveSelectedBtn.textContent = count > 0 ? `移除已選取（${count}）` : '移除已選取';
+  imageManagerSelectAll.checked = rowIds.length > 0 && rowIds.every(id => selectedImageIds.has(id));
+}
+
+function downloadDataUrl(dataUrl, filename){
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function downloadSelectedImages(){
+  const ids = [...selectedImageIds].filter(id => {
+    const g = games.find(x => x.id === id);
+    return g && g.image;
+  });
+  if(ids.length === 0){ showToast('選取的項目中沒有圖片可下載'); return; }
+  if(typeof JSZip === 'undefined'){ showToast('下載元件載入失敗，請確認網路連線後重新整理再試'); return; }
+  showToast('打包中，請稍候…');
+  const zip = new JSZip();
+  const usedNames = new Set();
+  ids.forEach(id=>{
+    const g = games.find(x => x.id === id);
+    const base64Data = g.image.split(',')[1];
+    const safeBase = (g.name || id).replace(/[\\/:*?"<>|]/g, '_').trim() || id;
+    let finalName = `${safeBase}.jpg`;
+    let n = 2;
+    while(usedNames.has(finalName)){ finalName = `${safeBase}_${n}.jpg`; n++; }
+    usedNames.add(finalName);
+    zip.file(finalName, base64Data, { base64: true });
+  });
+  try{
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '桌遊圖片.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`已下載 ${ids.length} 張圖片`);
+  }catch(err){
+    console.error(err);
+    showToast('打包下載失敗，請稍後再試');
+  }
 }
 
 imageManagerBtn.addEventListener('click', ()=>{
   listPanel.classList.remove('show');
   if(!isOwner){ showToast('只有管理者可以管理圖片'); return; }
+  selectedImageIds.clear();
   renderImageManagerList();
   imageManagerOverlay.classList.add('show');
 });
 imageManagerClose.addEventListener('click', ()=> imageManagerOverlay.classList.remove('show'));
 imageManagerOverlay.addEventListener('click', (e)=>{ if(e.target === imageManagerOverlay) imageManagerOverlay.classList.remove('show'); });
 
-imageManagerList.addEventListener('click', (e)=>{
-  const uploadBtn = e.target.closest('.img-upload-btn');
-  if(uploadBtn){
-    const fileInput = uploadBtn.closest('.image-manager-row').querySelector('.img-manager-file-input');
-    fileInput.click();
-    return;
+imageManagerSelectAll.addEventListener('change', ()=>{
+  if(imageManagerSelectAll.checked){
+    games.forEach(g => selectedImageIds.add(g.id));
+  } else {
+    selectedImageIds.clear();
   }
-  const removeBtn = e.target.closest('.img-remove-row-btn');
-  if(removeBtn && !removeBtn.disabled){
-    const id = removeBtn.dataset.id;
-    const g = games.find(x=>x.id===id);
-    if(!g) return;
-    if(!confirm(`確定要移除「${g.name}」的圖片嗎？`)) return;
-    updateDoc(doc(db, 'games', id), { image: null })
-      .then(()=>{
-        showToast('已移除圖片');
-        renderImageManagerList();
-      })
-      .catch(()=> showToast('移除失敗，請稍後再試'));
+  renderImageManagerList();
+});
+
+imageManagerDownloadSelectedBtn.addEventListener('click', downloadSelectedImages);
+
+imageManagerRemoveSelectedBtn.addEventListener('click', async ()=>{
+  const ids = [...selectedImageIds].filter(id => {
+    const g = games.find(x => x.id === id);
+    return g && g.image;
+  });
+  if(ids.length === 0){ showToast('選取的項目中沒有圖片可移除'); return; }
+  if(!confirm(`確定要移除這 ${ids.length} 款桌遊的圖片嗎？`)) return;
+  imageManagerRemoveSelectedBtn.disabled = true;
+  try{
+    for(const id of ids){
+      await updateDoc(doc(db, 'games', id), { image: null });
+    }
+    showToast(`已移除 ${ids.length} 張圖片`);
+  }catch(err){
+    console.error(err);
+    showToast('移除過程中發生錯誤，部分項目可能未完成');
   }
+  renderImageManagerList();
 });
 
 imageManagerList.addEventListener('change', async (e)=>{
+  const rowCheckbox = e.target.closest('.img-row-select');
+  if(rowCheckbox){
+    const id = rowCheckbox.dataset.id;
+    if(rowCheckbox.checked){ selectedImageIds.add(id); } else { selectedImageIds.delete(id); }
+    updateImageManagerBatchUI();
+    return;
+  }
   const fileInput = e.target.closest('.img-manager-file-input');
   if(!fileInput) return;
   const file = fileInput.files[0];
@@ -1140,6 +1465,36 @@ imageManagerList.addEventListener('change', async (e)=>{
   }catch(err){
     console.error(err);
     showToast('上傳失敗，請稍後再試');
+  }
+});
+
+imageManagerList.addEventListener('click', (e)=>{
+  const uploadBtn = e.target.closest('.img-upload-btn');
+  if(uploadBtn){
+    const fileInput = uploadBtn.closest('.image-manager-row').querySelector('.img-manager-file-input');
+    fileInput.click();
+    return;
+  }
+  const downloadRowBtn = e.target.closest('.img-download-row-btn');
+  if(downloadRowBtn && !downloadRowBtn.disabled){
+    const id = downloadRowBtn.dataset.id;
+    const g = games.find(x=>x.id===id);
+    if(!g || !g.image) return;
+    downloadDataUrl(g.image, `${(g.name||'game').replace(/[\\/:*?"<>|]/g,'_')}.jpg`);
+    return;
+  }
+  const removeBtn = e.target.closest('.img-remove-row-btn');
+  if(removeBtn && !removeBtn.disabled){
+    const id = removeBtn.dataset.id;
+    const g = games.find(x=>x.id===id);
+    if(!g) return;
+    if(!confirm(`確定要移除「${g.name}」的圖片嗎？`)) return;
+    updateDoc(doc(db, 'games', id), { image: null })
+      .then(()=>{
+        showToast('已移除圖片');
+        renderImageManagerList();
+      })
+      .catch(()=> showToast('移除失敗，請稍後再試'));
   }
 });
 
