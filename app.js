@@ -105,9 +105,13 @@ const bannerRemoveBtn = document.getElementById('banner-remove-btn');
 const bannerFileInput = document.getElementById('banner-file-input');
 const customSubtitleInput = document.getElementById('custom-subtitle');
 const subtitlePencil = document.getElementById('subtitle-pencil');
-const filterToggleBtn = document.getElementById('filter-toggle-btn');
-const filterPanel = document.getElementById('filter-panel');
-const filterBadge = document.getElementById('filter-badge');
+const badgePlayers = document.getElementById('badge-players');
+const badgeLang = document.getElementById('badge-lang');
+const badgeGenre = document.getElementById('badge-genre');
+const badgeSeries = document.getElementById('badge-series');
+const badgeYear = document.getElementById('badge-year');
+const badgeDifficulty = document.getElementById('badge-difficulty');
+const badgeType = document.getElementById('badge-type');
 const listToggleBtn = document.getElementById('list-toggle-btn');
 const listPanel = document.getElementById('list-panel');
 
@@ -388,7 +392,7 @@ function renderGenreLegend(){
       ? `<svg class="genre-note-pencil" data-genre="${escapeHtml(t)}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
       : '';
     return `
-    <div class="genre-legend-item">
+    <div class="genre-legend-item" data-genre="${escapeHtml(t)}">
       <div class="genre-legend-head">
         <span class="tag">${escapeHtml(t)}</span>
         <span class="genre-legend-count">${genreCounts.get(t)} 款</span>
@@ -441,21 +445,61 @@ dailyPickSection.addEventListener('click', (e)=>{
 });
 genreLegendList.addEventListener('click', (e)=>{
   const pencil = e.target.closest('.genre-note-pencil');
-  if(!pencil || !isOwner) return;
-  const genre = pencil.dataset.genre;
-  const current = genreNotes[genre] || '';
-  const val = prompt(`請輸入「${genre}」的簡介說明：`, current);
-  if(val === null) return;
-  genreNotes[genre] = val.trim();
-  saveGenreNotes();
-  renderGenreLegend();
+  if(pencil){
+    if(!isOwner) return;
+    const genre = pencil.dataset.genre;
+    const current = genreNotes[genre] || '';
+    const val = prompt(`請輸入「${genre}」的簡介說明：`, current);
+    if(val === null) return;
+    genreNotes[genre] = val.trim();
+    saveGenreNotes();
+    renderGenreLegend();
+    return;
+  }
+  const card = e.target.closest('.genre-legend-item');
+  if(card){
+    filterByGenreFromHome(card.dataset.genre);
+  }
 });
+
+function filterByGenreFromHome(genre){
+  selectedPlayers.clear();
+  selectedLangs.clear();
+  selectedTypes.clear();
+  selectedGenres.clear();
+  selectedGenres.add(genre);
+  selectedSeries.clear();
+  selectedYears.clear();
+  selectedDifficulties.clear();
+  document.getElementById('search-input').value = '';
+  updateLangFilterOptions();
+  updateGenreFilterOptions();
+  updateSeriesFilterOptions();
+  updateYearFilterOptions();
+  document.querySelectorAll('#filter-players-group input, #filter-difficulty-group input, #filter-type-group input')
+    .forEach(cb => cb.checked = false);
+  currentPage = 1;
+  homeView.style.display = 'none';
+  libraryView.style.display = 'block';
+  renderGrid();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 
 function renderCard(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
   const genreTags = (g.genres||[]).map(t=>`<span class="tag filter-tag" data-filter="genre" data-value="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
-  const langTags = (g.languages||[]).map(t=>`<span class="tag-lang">${escapeHtml(t)}</span>`).join('');
+  const languages = g.languages || [];
+  let langHtml = '';
+  if(languages.length === 1){
+    langHtml = `<span class="tag-lang filter-tag" data-filter="lang" data-value="${escapeHtml(languages[0])}">${escapeHtml(languages[0])}</span>`;
+  } else if(languages.length > 1){
+    const fullList = languages.map(l=>`<span class="tag-lang filter-tag" data-filter="lang" data-value="${escapeHtml(l)}">${escapeHtml(l)}</span>`).join('');
+    langHtml = `<div class="lang-hover-group">
+      <span class="tag-lang lang-summary">${escapeHtml(languages[0])} +${languages.length-1}</span>
+      <div class="lang-dropdown-list">${fullList}</div>
+    </div>`;
+  }
   const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
   const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${escapeHtml(g.series)} 系列</span>` : '';
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
@@ -463,8 +507,8 @@ function renderCard(g){
   const imgHtml = g.image
     ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
-  const cornerBadges = (expansionTag || seriesTag || langTags)
-    ? `<div class="card-img-badges">${expansionTag}${seriesTag}${langTags}</div>` : '';
+  const cornerBadges = (expansionTag || seriesTag || langHtml)
+    ? `<div class="card-img-badges">${expansionTag}${seriesTag}${langHtml}</div>` : '';
   const newBadge = isNewGame(g) ? `<div class="card-new-badge">新發現！</div>` : '';
   return `
   <div class="card" data-id="${g.id}">
@@ -496,17 +540,26 @@ function currentFilters(){
   };
 }
 
+function setFacetBadge(el, size){
+  if(size > 0){
+    el.textContent = size;
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function updateFilterBadge(){
+  setFacetBadge(badgePlayers, selectedPlayers.size);
+  setFacetBadge(badgeLang, selectedLangs.size);
+  setFacetBadge(badgeGenre, selectedGenres.size);
+  setFacetBadge(badgeSeries, selectedSeries.size);
+  setFacetBadge(badgeYear, selectedYears.size);
+  setFacetBadge(badgeDifficulty, selectedDifficulties.size);
+  setFacetBadge(badgeType, selectedTypes.size);
   const count = selectedPlayers.size + selectedLangs.size + selectedTypes.size +
     selectedGenres.size + selectedSeries.size + selectedYears.size + selectedDifficulties.size;
-  if(count > 0){
-    filterBadge.textContent = count;
-    filterBadge.style.display = 'flex';
-    resetFiltersBtn.style.display = 'flex';
-  } else {
-    filterBadge.style.display = 'none';
-    resetFiltersBtn.style.display = 'none';
-  }
+  resetFiltersBtn.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function renderGrid(){
@@ -822,6 +875,9 @@ grid.addEventListener('click', async (e)=>{
     } else if(type === 'series'){
       selectedSeries.add(value);
       updateSeriesFilterOptions();
+    } else if(type === 'lang'){
+      selectedLangs.add(value);
+      updateLangFilterOptions();
     }
     onFilterChanged();
     showToast(`已套用篩選：${value}`);
@@ -890,9 +946,9 @@ resetFiltersBtn.addEventListener('click', ()=>{
   selectedSeries.clear();
   selectedYears.clear();
   selectedDifficulties.clear();
-  filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.facet-panel input[type="checkbox"]').forEach(cb => cb.checked = false);
   onFilterChanged();
-  filterPanel.classList.remove('show');
+  document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
 });
 
 /* title editing */
@@ -991,20 +1047,25 @@ bannerRemoveBtn.addEventListener('click', async ()=>{
   showToast('已移除橫幅圖片');
 });
 
-/* filter & list dropdowns */
-filterToggleBtn.addEventListener('click', (e)=>{
-  e.stopPropagation();
-  listPanel.classList.remove('show');
-  filterPanel.classList.toggle('show');
+/* facet & list dropdowns */
+document.querySelectorAll('.facet-dropdown').forEach(dropdown=>{
+  const btn = dropdown.querySelector('.btn-facet');
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const wasOpen = dropdown.classList.contains('show');
+    listPanel.classList.remove('show');
+    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
+    if(!wasOpen) dropdown.classList.add('show');
+  });
 });
 listToggleBtn.addEventListener('click', (e)=>{
   e.stopPropagation();
-  filterPanel.classList.remove('show');
+  document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
   listPanel.classList.toggle('show');
 });
 document.addEventListener('click', (e)=>{
-  if(!e.target.closest('.filter-dropdown')){
-    filterPanel.classList.remove('show');
+  if(!e.target.closest('.facet-dropdown')){
+    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
   }
   if(!e.target.closest('.list-dropdown')){
     listPanel.classList.remove('show');
