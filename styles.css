@@ -431,6 +431,41 @@ body.is-logged-in .user-chip{display:flex;}
 
 /* ---------- Home view: recommendation + genre legend ---------- */
 #home-view{margin-bottom:8px;}
+
+.daily-pick-section{margin-bottom:30px;}
+.daily-pick-label{
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:700;color:var(--accent-mustard);
+  letter-spacing:0.04em;margin-bottom:10px;text-transform:uppercase;
+}
+.daily-pick-card{
+  display:flex;gap:20px;background:var(--surface);border-radius:16px;overflow:hidden;
+  box-shadow:0 14px 34px rgba(0,0,0,0.3);border:1px solid var(--line);cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.daily-pick-card:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(0,0,0,0.35);}
+.daily-pick-img{
+  flex:0 0 220px;aspect-ratio:4/3;background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.daily-pick-img img{width:100%;height:100%;object-fit:cover;}
+.daily-pick-img .placeholder{color:var(--ink-soft);font-size:12px;font-family:'IBM Plex Mono',monospace;}
+.daily-pick-body{flex:1;padding:20px 22px 20px 0;display:flex;flex-direction:column;gap:6px;min-width:0;}
+.daily-pick-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:var(--ink);}
+.daily-pick-desc{
+  font-size:13.5px;color:var(--ink-soft);line-height:1.6;flex:1;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0 8px;
+}
+.btn-daily-pick-detail{
+  align-self:flex-start;background:var(--accent-mustard);color:var(--ink);border:none;
+  padding:9px 18px;border-radius:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13.5px;
+  cursor:pointer;transition:background .12s ease;
+}
+.btn-daily-pick-detail:hover{background:var(--accent-mustard-dark);color:#fff;}
+@media (max-width: 560px){
+  .daily-pick-card{flex-direction:column;}
+  .daily-pick-img{flex:none;width:100%;aspect-ratio:16/9;}
+  .daily-pick-body{padding:16px;}
+}
 .recommend-section{margin-bottom:34px;}
 .section-title-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .section-title-row h2, .genre-legend-section h2{
@@ -446,18 +481,24 @@ body.is-logged-in .user-chip{display:flex;}
 .recommend-textarea:hover, .recommend-textarea:focus{border-color:rgba(217,142,4,0.5);background:rgba(217,142,4,0.05);}
 
 .genre-legend-section{margin-bottom:36px;}
-.genre-legend-list{display:flex;flex-direction:column;gap:8px;}
+.genre-legend-list{display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:14px;}
 .genre-legend-item{
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-  background:rgba(255,255,255,0.04);border:1px solid rgba(243,234,211,0.12);border-radius:10px;
-  padding:10px 14px;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:8px;
 }
+.genre-legend-head{display:flex;align-items:center;gap:8px;}
 .genre-legend-item .tag{flex-shrink:0;}
-.genre-note-text{flex:1;font-size:13px;color:var(--text-on-bg-soft);line-height:1.5;min-width:150px;}
-.genre-note-text.empty{opacity:0.55;font-style:italic;}
-.genre-note-pencil{color:var(--text-on-bg-soft);opacity:0.7;cursor:pointer;flex-shrink:0;}
-.genre-note-pencil:hover{opacity:1;color:var(--accent-mustard);}
+.genre-legend-count{
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;color:var(--ink-soft);
+  background:rgba(34,48,60,0.06);padding:3px 9px;border-radius:20px;
+}
+.genre-note-text{flex:1;font-size:13px;color:var(--ink);line-height:1.5;}
+.genre-note-text.empty{color:var(--ink-soft);opacity:0.75;font-style:italic;}
+.genre-note-pencil{color:var(--ink-soft);opacity:0.8;cursor:pointer;flex-shrink:0;margin-left:auto;}
+.genre-note-pencil:hover{opacity:1;color:var(--accent-mustard-dark);}
 .genre-legend-empty{
+  grid-column:1/-1;
   color:var(--text-on-bg-soft);font-size:13.5px;font-family:'IBM Plex Mono',monospace;
   border:2px dashed rgba(243,234,211,0.25);border-radius:12px;padding:20px;text-align:center;
 }

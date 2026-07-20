@@ -58,6 +58,7 @@ const backHomeBtn = document.getElementById('back-home-btn');
 const recommendContent = document.getElementById('recommend-content');
 const recommendPencil = document.getElementById('recommend-pencil');
 const genreLegendList = document.getElementById('genre-legend-list');
+const dailyPickSection = document.getElementById('daily-pick-section');
 const pageSizeSelect = document.getElementById('page-size-select');
 const paginationEl = document.getElementById('pagination');
 const imageManagerBtn = document.getElementById('image-manager-btn');
@@ -280,6 +281,7 @@ onSnapshot(gamesCol, (snap)=>{
   updateSeriesFilterOptions();
   updateYearFilterOptions();
   renderGenreLegend();
+  renderDailyPick();
   renderGrid();
 }, (err)=>{
   console.error(err);
@@ -372,9 +374,9 @@ function updateYearFilterOptions(){
 }
 
 function renderGenreLegend(){
-  const genreSet = new Set();
-  games.forEach(g => (g.genres||[]).forEach(t => genreSet.add(t)));
-  const genres = [...genreSet].sort();
+  const genreCounts = new Map();
+  games.forEach(g => (g.genres||[]).forEach(t => genreCounts.set(t, (genreCounts.get(t)||0) + 1)));
+  const genres = [...genreCounts.keys()].sort();
   if(genres.length === 0){
     genreLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何類型標籤 — 新增桌遊時填寫「類型」欄位後，會自動列在這裡。</div>`;
     return;
@@ -387,12 +389,56 @@ function renderGenreLegend(){
       : '';
     return `
     <div class="genre-legend-item">
-      <span class="tag">${escapeHtml(t)}</span>
+      <div class="genre-legend-head">
+        <span class="tag">${escapeHtml(t)}</span>
+        <span class="genre-legend-count">${genreCounts.get(t)} 款</span>
+        ${pencil}
+      </div>
       <span class="genre-note-text ${note ? '' : 'empty'}">${noteHtml}</span>
-      ${pencil}
     </div>`;
   }).join('');
 }
+
+/* ---------- Daily pick (今日推薦) ---------- */
+function getDailyPick(){
+  if(games.length === 0) return null;
+  const sorted = [...games].sort((a,b)=> (a.id||'').localeCompare(b.id||''));
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+  let hash = 0;
+  for(let i=0; i<dateStr.length; i++){ hash = (hash*31 + dateStr.charCodeAt(i)) >>> 0; }
+  return sorted[hash % sorted.length];
+}
+
+function renderDailyPick(){
+  const pick = getDailyPick();
+  if(!pick){ dailyPickSection.innerHTML = ''; return; }
+  const now = new Date();
+  const dateLabel = `${now.getMonth()+1} 月 ${now.getDate()} 日．今日推薦`;
+  const genreTags = (pick.genres||[]).slice(0,3).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+  const imgHtml = pick.image
+    ? `<img src="${pick.image}" alt="${escapeHtml(pick.name)}">`
+    : `<div class="placeholder">尚未上傳圖片</div>`;
+  dailyPickSection.innerHTML = `
+    <div class="daily-pick-label">📅 ${dateLabel}</div>
+    <div class="daily-pick-card" data-id="${pick.id}">
+      <div class="daily-pick-img">${imgHtml}</div>
+      <div class="daily-pick-body">
+        <div class="daily-pick-name">${escapeHtml(pick.name)}</div>
+        ${pick.nameEn ? `<div class="card-name-en">${escapeHtml(pick.nameEn)}</div>` : ''}
+        ${pick.difficulty ? `<div class="difficulty-stars">${renderStars(pick.difficulty)}</div>` : ''}
+        <div class="tags">${genreTags}</div>
+        <div class="daily-pick-desc">${escapeHtml(pick.desc || '一起來認識這款桌遊吧！')}</div>
+        <button type="button" class="btn-daily-pick-detail">查看詳情 →</button>
+      </div>
+    </div>`;
+}
+dailyPickSection.addEventListener('click', (e)=>{
+  const card = e.target.closest('.daily-pick-card');
+  if(!card) return;
+  const g = games.find(x => x.id === card.dataset.id);
+  if(g) openDetailModal(g);
+});
 genreLegendList.addEventListener('click', (e)=>{
   const pencil = e.target.closest('.genre-note-pencil');
   if(!pencil || !isOwner) return;
@@ -1163,4 +1209,4 @@ importFileInput.addEventListener('change', async (e)=>{
 });
 
 /* 定時重繪，讓「新發現！」徽章滿 24 小時後能自動消失（不需重新整理頁面） */
-setInterval(()=>{ if(games.length) renderGrid(); }, 5 * 60 * 1000);
+setInterval(()=>{ if(games.length){ renderGrid(); renderDailyPick(); } }, 5 * 60 * 1000);
