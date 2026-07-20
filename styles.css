@@ -79,6 +79,11 @@ body.is-owner .banner-upload-btn{display:flex;}
   text-align:center;margin-top:36px;padding-top:20px;
   border-top:1px solid rgba(243,234,211,0.15);
 }
+.results-count{
+  font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text-on-bg-soft);
+  margin-bottom:16px;
+}
+.results-count strong{color:var(--text-on-bg);font-weight:700;}
 
 .custom-subtitle-box{display:flex;align-items:flex-start;gap:8px;margin-top:2px;}
 #custom-subtitle{
@@ -147,17 +152,23 @@ body.is-logged-in .user-chip{display:flex;}
 .filter-panel{
   display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:30;
   background:var(--surface);border:1px solid var(--line);border-radius:12px;
-  padding:16px;box-shadow:0 14px 30px rgba(0,0,0,0.25);min-width:230px;
+  padding:16px;box-shadow:0 14px 30px rgba(0,0,0,0.25);min-width:250px;max-width:300px;
+  max-height:70vh;overflow-y:auto;
   flex-direction:column;gap:12px;
 }
 .filter-panel.show{display:flex;}
-.filter-panel-row{display:flex;flex-direction:column;gap:5px;}
+.filter-panel-row{display:flex;flex-direction:column;gap:6px;}
 .filter-panel-row label{font-size:11.5px;font-weight:600;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
-.filter-panel select{
-  width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--line);background:#fff;
-  font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink);cursor:pointer;
+.checkbox-group{display:flex;flex-wrap:wrap;gap:6px;}
+.checkbox-option{
+  display:flex;align-items:center;gap:5px;
+  background:#fff;border:1.5px solid var(--line);border-radius:20px;
+  padding:5px 11px 5px 8px;font-size:12.5px;color:var(--ink);cursor:pointer;
+  font-family:'IBM Plex Mono',monospace;transition:border-color .1s ease, background .1s ease;
 }
-.filter-panel select:focus{outline:none;border-color:var(--accent-mustard);}
+.checkbox-option input{accent-color:var(--accent-mustard-dark);cursor:pointer;margin:0;}
+.checkbox-option:has(input:checked){border-color:var(--accent-mustard);background:rgba(217,142,4,0.1);font-weight:700;}
+.checkbox-empty{font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
 
 .list-dropdown{position:relative;}
 .list-panel{

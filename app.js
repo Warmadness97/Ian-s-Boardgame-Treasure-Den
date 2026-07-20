@@ -39,12 +39,22 @@ const imgInput = document.getElementById('img-input');
 const imgPreview = document.getElementById('img-preview');
 const imgHint = document.getElementById('img-hint');
 const titleInput = document.getElementById('site-title');
-const langFilterSelect = document.getElementById('filter-lang');
-const typeFilterSelect = document.getElementById('filter-type');
-const genreFilterSelect = document.getElementById('filter-genre');
-const seriesFilterSelect = document.getElementById('filter-series');
-const yearFilterSelect = document.getElementById('filter-year');
-const difficultyFilterSelect = document.getElementById('filter-difficulty');
+const filterPlayersGroup = document.getElementById('filter-players-group');
+const filterLangGroup = document.getElementById('filter-lang-group');
+const filterGenreGroup = document.getElementById('filter-genre-group');
+const filterSeriesGroup = document.getElementById('filter-series-group');
+const filterYearGroup = document.getElementById('filter-year-group');
+const filterDifficultyGroup = document.getElementById('filter-difficulty-group');
+const filterTypeGroup = document.getElementById('filter-type-group');
+const resultsCountEl = document.getElementById('results-count');
+
+const selectedPlayers = new Set();
+const selectedLangs = new Set();
+const selectedGenres = new Set();
+const selectedSeries = new Set();
+const selectedYears = new Set();
+const selectedDifficulties = new Set();
+const selectedTypes = new Set();
 const sortSelect = document.getElementById('sort-select');
 const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const importBtn = document.getElementById('import-btn');
@@ -251,13 +261,22 @@ async function saveBannerImage(dataUrlOrNull){
 }
 
 /* ---------- Rendering ---------- */
+function renderCheckboxGroup(container, values, selectedSet, emptyLabel){
+  if(values.length === 0){
+    container.innerHTML = `<span class="checkbox-empty">${emptyLabel}</span>`;
+    return;
+  }
+  container.innerHTML = values.map(v=>{
+    const strVal = String(v);
+    const checked = selectedSet.has(strVal) ? 'checked' : '';
+    return `<label class="checkbox-option"><input type="checkbox" value="${escapeHtml(strVal)}" ${checked}> ${escapeHtml(strVal)}</label>`;
+  }).join('');
+}
+
 function updateLangFilterOptions(){
   const langs = new Set();
   games.forEach(g => (g.languages||[]).forEach(l => langs.add(l)));
-  const current = langFilterSelect.value;
-  langFilterSelect.innerHTML = '<option value="">不限語言版本</option>' +
-    [...langs].sort().map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
-  if([...langs].includes(current)) langFilterSelect.value = current;
+  renderCheckboxGroup(filterLangGroup, [...langs].sort(), selectedLangs, '尚無語言版本資料');
 }
 
 function updateBaseGameOptions(){
@@ -269,28 +288,19 @@ function updateBaseGameOptions(){
 function updateGenreFilterOptions(){
   const genres = new Set();
   games.forEach(g => (g.genres||[]).forEach(t => genres.add(t)));
-  const current = genreFilterSelect.value;
-  genreFilterSelect.innerHTML = '<option value="">不限類型</option>' +
-    [...genres].sort().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-  if([...genres].includes(current)) genreFilterSelect.value = current;
+  renderCheckboxGroup(filterGenreGroup, [...genres].sort(), selectedGenres, '尚無類型資料');
 }
 
 function updateSeriesFilterOptions(){
   const seriesSet = new Set();
   games.forEach(g => { if(g.series) seriesSet.add(g.series); });
-  const current = seriesFilterSelect.value;
-  seriesFilterSelect.innerHTML = '<option value="">不限系列</option>' +
-    [...seriesSet].sort().map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-  if([...seriesSet].includes(current)) seriesFilterSelect.value = current;
+  renderCheckboxGroup(filterSeriesGroup, [...seriesSet].sort(), selectedSeries, '尚無系列資料');
 }
 
 function updateYearFilterOptions(){
   const years = new Set();
   games.forEach(g => { if(g.year) years.add(g.year); });
-  const current = yearFilterSelect.value;
-  yearFilterSelect.innerHTML = '<option value="">不限年份</option>' +
-    [...years].sort((a,b)=>b-a).map(y => `<option value="${y}">${y}</option>`).join('');
-  if([...years].map(String).includes(current)) yearFilterSelect.value = current;
+  renderCheckboxGroup(filterYearGroup, [...years].sort((a,b)=>b-a), selectedYears, '尚無年份資料');
 }
 
 function renderCard(g){
@@ -334,26 +344,13 @@ function renderCard(g){
 
 function currentFilters(){
   return {
-    q: document.getElementById('search-input').value.trim().toLowerCase(),
-    minPlayerFilter: parseInt(document.getElementById('filter-players').value, 10),
-    langFilter: langFilterSelect.value,
-    typeFilter: typeFilterSelect.value,
-    genreFilter: genreFilterSelect.value,
-    seriesFilter: seriesFilterSelect.value,
-    yearFilter: yearFilterSelect.value,
-    difficultyFilter: difficultyFilterSelect.value
+    q: document.getElementById('search-input').value.trim().toLowerCase()
   };
 }
 
-function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter}){
-  let count = 0;
-  if(minPlayerFilter > 0) count++;
-  if(langFilter) count++;
-  if(typeFilter) count++;
-  if(genreFilter) count++;
-  if(seriesFilter) count++;
-  if(yearFilter) count++;
-  if(difficultyFilter) count++;
+function updateFilterBadge(){
+  const count = selectedPlayers.size + selectedLangs.size + selectedTypes.size +
+    selectedGenres.size + selectedSeries.size + selectedYears.size + selectedDifficulties.size;
   if(count > 0){
     filterBadge.textContent = count;
     filterBadge.style.display = 'flex';
@@ -365,7 +362,7 @@ function updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter
 }
 
 function renderGrid(){
-  const {q, minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter} = currentFilters();
+  const {q} = currentFilters();
   let list = games;
   if(q){
     list = list.filter(g =>
@@ -377,34 +374,35 @@ function renderGrid(){
       (g.baseGameName||'').toLowerCase().includes(q)
     );
   }
-  if(minPlayerFilter > 0){
-    if(minPlayerFilter >= 6){
-      list = list.filter(g => g.maxPlayers >= 6);
-    } else {
-      list = list.filter(g => g.minPlayers <= minPlayerFilter && g.maxPlayers >= minPlayerFilter);
-    }
+  if(selectedPlayers.size > 0){
+    list = list.filter(g => [...selectedPlayers].some(p=>{
+      const n = parseInt(p, 10);
+      return n >= 6 ? g.maxPlayers >= 6 : (g.minPlayers <= n && g.maxPlayers >= n);
+    }));
   }
-  if(langFilter){
-    list = list.filter(g => (g.languages||[]).includes(langFilter));
+  if(selectedLangs.size > 0){
+    list = list.filter(g => (g.languages||[]).some(l => selectedLangs.has(l)));
   }
-  if(typeFilter){
-    list = list.filter(g => (g.gameType||'base') === typeFilter);
+  if(selectedTypes.size > 0){
+    list = list.filter(g => selectedTypes.has(g.gameType||'base'));
   }
-  if(genreFilter){
-    list = list.filter(g => (g.genres||[]).includes(genreFilter));
+  if(selectedGenres.size > 0){
+    list = list.filter(g => (g.genres||[]).some(t => selectedGenres.has(t)));
   }
-  if(seriesFilter){
-    list = list.filter(g => g.series === seriesFilter);
+  if(selectedSeries.size > 0){
+    list = list.filter(g => g.series && selectedSeries.has(g.series));
   }
-  if(yearFilter){
-    list = list.filter(g => String(g.year||'') === yearFilter);
+  if(selectedYears.size > 0){
+    list = list.filter(g => g.year && selectedYears.has(String(g.year)));
   }
-  if(difficultyFilter){
-    list = list.filter(g => String(g.difficulty||'') === difficultyFilter);
+  if(selectedDifficulties.size > 0){
+    list = list.filter(g => g.difficulty && selectedDifficulties.has(String(g.difficulty)));
   }
-  updateFilterBadge({minPlayerFilter, langFilter, typeFilter, genreFilter, seriesFilter, yearFilter, difficultyFilter});
+  updateFilterBadge();
   countLabel.textContent = games.length;
   list = applySort(list, sortSelect.value);
+  resultsCountEl.style.display = games.length > 0 ? 'block' : 'none';
+  resultsCountEl.innerHTML = `符合條件：<strong>${list.length}</strong> / ${games.length} 款桌遊`;
   if(list.length === 0){
     grid.style.display = 'none';
     emptyEl.style.display = 'block';
@@ -612,9 +610,11 @@ grid.addEventListener('click', async (e)=>{
     const type = filterTagEl.dataset.filter;
     const value = filterTagEl.dataset.value;
     if(type === 'genre'){
-      genreFilterSelect.value = value;
+      selectedGenres.add(value);
+      updateGenreFilterOptions();
     } else if(type === 'series'){
-      seriesFilterSelect.value = value;
+      selectedSeries.add(value);
+      updateSeriesFilterOptions();
     }
     renderGrid();
     showToast(`已套用篩選：${value}`);
@@ -652,23 +652,34 @@ grid.addEventListener('click', async (e)=>{
 
 /* search + filter */
 document.getElementById('search-input').addEventListener('input', renderGrid);
-document.getElementById('filter-players').addEventListener('change', renderGrid);
-langFilterSelect.addEventListener('change', renderGrid);
-typeFilterSelect.addEventListener('change', renderGrid);
-genreFilterSelect.addEventListener('change', renderGrid);
-seriesFilterSelect.addEventListener('change', renderGrid);
-yearFilterSelect.addEventListener('change', renderGrid);
-difficultyFilterSelect.addEventListener('change', renderGrid);
 sortSelect.addEventListener('change', renderGrid);
+
+function wireCheckboxGroup(container, targetSet){
+  container.addEventListener('change', (e)=>{
+    if(e.target.type !== 'checkbox') return;
+    const val = e.target.value;
+    if(e.target.checked){ targetSet.add(val); } else { targetSet.delete(val); }
+    renderGrid();
+  });
+}
+wireCheckboxGroup(filterPlayersGroup, selectedPlayers);
+wireCheckboxGroup(filterLangGroup, selectedLangs);
+wireCheckboxGroup(filterGenreGroup, selectedGenres);
+wireCheckboxGroup(filterSeriesGroup, selectedSeries);
+wireCheckboxGroup(filterYearGroup, selectedYears);
+wireCheckboxGroup(filterDifficultyGroup, selectedDifficulties);
+wireCheckboxGroup(filterTypeGroup, selectedTypes);
+
 resetFiltersBtn.addEventListener('click', ()=>{
   document.getElementById('search-input').value = '';
-  document.getElementById('filter-players').value = '0';
-  langFilterSelect.value = '';
-  typeFilterSelect.value = '';
-  genreFilterSelect.value = '';
-  seriesFilterSelect.value = '';
-  yearFilterSelect.value = '';
-  difficultyFilterSelect.value = '';
+  selectedPlayers.clear();
+  selectedLangs.clear();
+  selectedTypes.clear();
+  selectedGenres.clear();
+  selectedSeries.clear();
+  selectedYears.clear();
+  selectedDifficulties.clear();
+  filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
   renderGrid();
   filterPanel.classList.remove('show');
 });
