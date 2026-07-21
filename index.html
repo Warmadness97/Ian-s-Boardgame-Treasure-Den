@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -173,6 +173,7 @@
         <div class="checkbox-group" id="filter-type-group">
           <label class="checkbox-option"><input type="checkbox" value="base"> 主遊戲</label>
           <label class="checkbox-option"><input type="checkbox" value="expansion"> 擴充</label>
+          <label class="checkbox-option"><input type="checkbox" value="standalone"> 可獨立遊玩的擴充</label>
         </div>
       </div>
     </div>
@@ -270,6 +271,9 @@
         <label>此擴充所屬的主遊戲（選填）</label>
         <input type="text" id="f-basegame" list="base-game-list" placeholder="例如：卡卡頌">
         <datalist id="base-game-list"></datalist>
+        <label class="checkbox-inline-label">
+          <input type="checkbox" id="f-standalone"> 可獨立遊玩，不需要主遊戲
+        </label>
       </div>
       <div class="field">
         <label>系列（選填，例如：卡卡頌系列）</label>
@@ -344,6 +348,21 @@
   </div>
 </div>
 
+<div class="overlay" id="crop-overlay">
+  <div class="modal crop-modal">
+    <button class="detail-close" id="crop-close">✕</button>
+    <h2>調整圖片顯示範圍</h2>
+    <p class="image-manager-hint">拖曳圖片調整要顯示在卡片上的位置，調整好後按「套用」。</p>
+    <div class="crop-viewport" id="crop-viewport">
+      <img id="crop-img" draggable="false" alt="">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="crop-cancel">取消</button>
+      <button type="button" class="btn-primary" id="crop-apply">套用</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="image-manager-overlay">
   <div class="modal image-manager-modal">
     <button class="detail-close" id="image-manager-close">✕</button>
@@ -401,6 +420,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=18"></script>
 </body>
 </html>

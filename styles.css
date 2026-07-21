@@ -241,7 +241,7 @@ body.is-logged-in .user-chip{display:flex;}
 .card{
   background:var(--surface);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);
   border:1px solid var(--line);
-  display:flex;flex-direction:column;
+  display:flex;flex-direction:column;height:480px;
   transition:transform .16s ease, box-shadow .16s ease;
   position:relative;
   cursor:pointer;
@@ -262,15 +262,15 @@ body.is-logged-in .user-chip{display:flex;}
   background:rgba(255,252,244,0.94);box-shadow:0 1px 5px rgba(0,0,0,0.3);
   text-align:right;
 }
-.lang-hover-group{position:relative;}
-.lang-summary{cursor:default;}
-.lang-dropdown-list{
+.tag-hover-group{position:relative;display:inline-block;}
+.tag-summary{cursor:default;}
+.tag-dropdown-list{
   display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:6;
   flex-direction:column;align-items:flex-end;gap:4px;
   background:rgba(255,252,244,0.97);border-radius:8px;padding:6px;
   box-shadow:0 6px 16px rgba(0,0,0,0.3);min-width:max-content;
 }
-.lang-hover-group:hover .lang-dropdown-list{display:flex;}
+.tag-hover-group:hover .tag-dropdown-list{display:flex;}
 .card-new-badge{
   position:absolute;top:8px;left:8px;z-index:2;
   background:var(--accent-brick);color:#fff;
@@ -285,9 +285,15 @@ body.is-logged-in .user-chip{display:flex;}
 @media (prefers-reduced-motion: reduce){
   .card-new-badge{animation:none;}
 }
-.card-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
-.card-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;line-height:1.25;}
-.card-name-en{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin-top:-4px;}
+.card-body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;overflow:hidden;}
+.card-name{
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;line-height:1.25;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.card-name-en{
+  font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);margin-top:-4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 .card-year{
   display:flex;align-items:center;gap:4px;
   font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);
@@ -325,6 +331,7 @@ body.is-logged-in .user-chip{display:flex;}
 .filter-tag:active{transform:translateY(0);}
 .base-game-note{
   font-size:12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .difficulty-stars{font-size:13px;letter-spacing:1px;}
 .difficulty-stars .filled{color:var(--accent-mustard);}
@@ -373,6 +380,11 @@ body.is-logged-in .user-chip{display:flex;}
 }
 .radio-pill input{accent-color:var(--accent-mustard-dark);}
 .radio-pill:has(input:checked){border-color:var(--accent-mustard);color:var(--ink);background:rgba(217,142,4,0.08);font-weight:600;}
+.checkbox-inline-label{
+  display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px;color:var(--ink-soft);
+  font-family:'Inter',sans-serif;cursor:pointer;
+}
+.checkbox-inline-label input{accent-color:var(--accent-mustard-dark);cursor:pointer;}
 
 .star-input{display:flex;align-items:center;gap:2px;}
 .star-input .star-btn{
@@ -584,6 +596,16 @@ body.is-logged-in .user-chip{display:flex;}
   padding:8px 14px;border-radius:8px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;
 }
 .btn-remove-image:hover{background:rgba(166,61,64,0.08);border-color:var(--accent-brick);}
+
+/* ---------- Image crop / reposition tool ---------- */
+.crop-modal{max-width:420px;position:relative;}
+.crop-viewport{
+  position:relative;width:100%;aspect-ratio:3/2;overflow:hidden;border-radius:12px;
+  background:var(--surface-2);cursor:grab;touch-action:none;margin-bottom:4px;
+  border:1px solid var(--line);
+}
+.crop-viewport.dragging{cursor:grabbing;}
+.crop-viewport img{position:absolute;top:0;left:0;max-width:none;user-select:none;pointer-events:none;}
 
 /* ---------- Batch image manager ---------- */
 .image-manager-modal{max-width:560px;position:relative;}

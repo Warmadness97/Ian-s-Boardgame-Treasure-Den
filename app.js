@@ -104,6 +104,7 @@ const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
 const baseGameList = document.getElementById('base-game-list');
 const baseGameField = document.getElementById('base-game-field');
+const standaloneCheckbox = document.getElementById('f-standalone');
 const difficultyInputEl = document.getElementById('f-difficulty');
 const difficultyStarBtns = document.querySelectorAll('#difficulty-input .star-btn');
 const difficultyClearBtn = document.getElementById('difficulty-clear');
@@ -456,7 +457,7 @@ function buildLegendListHtml(itemsHtml, expanded, toggleId){
 function renderGenreLegend(){
   const genreCounts = new Map();
   games.forEach(g => (g.genres||[]).forEach(t => genreCounts.set(t, (genreCounts.get(t)||0) + 1)));
-  const genres = [...genreCounts.keys()].sort();
+  const genres = [...genreCounts.keys()].sort((a,b)=> genreCounts.get(b) - genreCounts.get(a) || a.localeCompare(b));
   if(genres.length === 0){
     genreLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何類型標籤 — 新增桌遊時填寫「類型」欄位後，會自動列在這裡。</div>`;
     return;
@@ -483,7 +484,7 @@ function renderGenreLegend(){
 function renderSeriesLegend(){
   const seriesCounts = new Map();
   games.forEach(g => { if(g.series) seriesCounts.set(g.series, (seriesCounts.get(g.series)||0) + 1); });
-  const seriesNames = [...seriesCounts.keys()].sort();
+  const seriesNames = [...seriesCounts.keys()].sort((a,b)=> seriesCounts.get(b) - seriesCounts.get(a) || a.localeCompare(b));
   if(seriesNames.length === 0){
     seriesLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何系列 — 新增桌遊時填寫「系列」欄位後，會自動列在這裡。</div>`;
     return;
@@ -561,7 +562,9 @@ function getDailyPick(){
     const picked = games.find(g => g.id === featuredGameId);
     if(picked) return picked;
   }
-  const sorted = [...games].sort((a,b)=> (a.id||'').localeCompare(b.id||''));
+  const baseGames = games.filter(g => g.gameType !== 'expansion');
+  const pool = baseGames.length > 0 ? baseGames : games;
+  const sorted = [...pool].sort((a,b)=> (a.id||'').localeCompare(b.id||''));
   const now = new Date();
   const dateStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
   let hash = 0;
@@ -677,22 +680,25 @@ function filterByGenreFromHome(genre){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
+function buildTagGroup(items, tagClass, filterType){
+  if(!items || items.length === 0) return '';
+  if(items.length === 1){
+    return `<span class="${tagClass} filter-tag" data-filter="${filterType}" data-value="${escapeHtml(items[0])}">${escapeHtml(items[0])}</span>`;
+  }
+  const fullList = items.map(v=>`<span class="${tagClass} filter-tag" data-filter="${filterType}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</span>`).join('');
+  return `<div class="tag-hover-group">
+    <span class="${tagClass} tag-summary">${escapeHtml(items[0])} +${items.length-1}</span>
+    <div class="tag-dropdown-list">${fullList}</div>
+  </div>`;
+}
+
 function renderCard(g, stackInfo){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
-  const genreTags = (g.genres||[]).map(t=>`<span class="tag filter-tag" data-filter="genre" data-value="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
-  const languages = g.languages || [];
-  let langHtml = '';
-  if(languages.length === 1){
-    langHtml = `<span class="tag-lang filter-tag" data-filter="lang" data-value="${escapeHtml(languages[0])}">${escapeHtml(languages[0])}</span>`;
-  } else if(languages.length > 1){
-    const fullList = languages.map(l=>`<span class="tag-lang filter-tag" data-filter="lang" data-value="${escapeHtml(l)}">${escapeHtml(l)}</span>`).join('');
-    langHtml = `<div class="lang-hover-group">
-      <span class="tag-lang lang-summary">${escapeHtml(languages[0])} +${languages.length-1}</span>
-      <div class="lang-dropdown-list">${fullList}</div>
-    </div>`;
-  }
-  const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
+  const genreHtml = buildTagGroup(g.genres, 'tag', 'genre');
+  const langHtml = buildTagGroup(g.languages, 'tag-lang', 'lang');
+  const expansionTag = g.gameType === 'expansion'
+    ? `<span class="tag-expansion">擴充${g.standalone ? '・可獨立' : ''}</span>` : '';
   const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${escapeHtml(g.series)} 系列</span>` : '';
   const stackCountNote = stackInfo ? `<div class="stack-count-note">📚 這個系列共有 ${stackInfo.count} 款作品</div>` : '';
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
@@ -712,7 +718,7 @@ function renderCard(g, stackInfo){
       ${g.year ? `<div class="card-year">${CALENDAR_ICON}${g.year}</div>` : ''}
       ${g.difficulty ? `<div class="difficulty-stars">${renderStars(g.difficulty)}</div>` : ''}
       ${stackCountNote}
-      ${genreTags ? `<div class="tags">${genreTags}</div>` : ''}
+      ${genreHtml ? `<div class="tags">${genreHtml}</div>` : ''}
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
       <div class="stats-row">
@@ -787,7 +793,12 @@ function renderGrid(){
     list = list.filter(g => (g.languages||[]).some(l => selectedLangs.has(l)));
   }
   if(selectedTypes.size > 0){
-    list = list.filter(g => selectedTypes.has(g.gameType||'base'));
+    list = list.filter(g => {
+      const type = g.gameType || 'base';
+      if(selectedTypes.has(type)) return true;
+      if(selectedTypes.has('standalone') && type === 'expansion' && g.standalone) return true;
+      return false;
+    });
   }
   if(selectedGenres.size > 0){
     list = list.filter(g => (g.genres||[]).some(t => selectedGenres.has(t)));
@@ -912,6 +923,7 @@ function openModal(mode, game){
   document.getElementById('f-type-base').checked = gameType === 'base';
   document.getElementById('f-type-expansion').checked = gameType === 'expansion';
   document.getElementById('f-basegame').value = game ? (game.baseGameName || '') : '';
+  standaloneCheckbox.checked = game ? !!game.standalone : false;
   document.getElementById('f-series').value = game ? (game.series || '') : '';
   document.getElementById('f-url').value = game ? (game.url || '') : '';
   document.getElementById('f-year').value = game ? (game.year || '') : '';
@@ -982,11 +994,13 @@ function compressImage(file, maxDim, quality){
 
 async function handleImageFile(file){
   if(!file) return;
-  pendingImageData = await compressImage(file, 560, 0.68);
-  imgPreview.src = pendingImageData;
-  imgPreview.style.display = 'block';
-  imgHint.textContent = '點擊更換圖片';
-  imgRemoveBtn.style.display = 'inline-block';
+  openCropTool(file, (dataUrl)=>{
+    pendingImageData = dataUrl;
+    imgPreview.src = pendingImageData;
+    imgPreview.style.display = 'block';
+    imgHint.textContent = '點擊更換圖片';
+    imgRemoveBtn.style.display = 'inline-block';
+  });
 }
 imgInput.addEventListener('change', (e)=> handleImageFile(e.target.files[0]));
 
@@ -999,6 +1013,99 @@ imgRemoveBtn.addEventListener('click', ()=>{
   imgPreview.style.display = 'none';
   imgHint.textContent = '點擊或拖曳圖片到此處上傳';
   imgRemoveBtn.style.display = 'none';
+});
+
+/* ---------- Image crop / reposition tool ---------- */
+const cropOverlay = document.getElementById('crop-overlay');
+const cropClose = document.getElementById('crop-close');
+const cropCancel = document.getElementById('crop-cancel');
+const cropApply = document.getElementById('crop-apply');
+const cropViewport = document.getElementById('crop-viewport');
+const cropImg = document.getElementById('crop-img');
+let cropState = null;
+let cropDragging = false;
+let cropDragStartX = 0, cropDragStartY = 0, cropStartOffsetX = 0, cropStartOffsetY = 0;
+
+function openCropTool(file, callback){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const dataUrl = e.target.result;
+    const img = new Image();
+    img.onload = ()=>{
+      cropOverlay.classList.add('show');
+      requestAnimationFrame(()=>{
+        const vw = cropViewport.clientWidth;
+        const vh = cropViewport.clientHeight;
+        const scale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
+        const dispW = img.naturalWidth * scale;
+        const dispH = img.naturalHeight * scale;
+        cropState = {
+          naturalW: img.naturalWidth, naturalH: img.naturalHeight,
+          scale, vw, vh, dispW, dispH,
+          offsetX: (vw - dispW) / 2, offsetY: (vh - dispH) / 2,
+          dataUrl, callback
+        };
+        cropImg.src = dataUrl;
+        cropImg.style.width = dispW + 'px';
+        cropImg.style.height = dispH + 'px';
+        updateCropImgTransform();
+      });
+    };
+    img.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+function updateCropImgTransform(){
+  cropImg.style.transform = `translate(${cropState.offsetX}px, ${cropState.offsetY}px)`;
+}
+function clampCropOffset(){
+  const minX = cropState.vw - cropState.dispW;
+  const minY = cropState.vh - cropState.dispH;
+  cropState.offsetX = Math.min(0, Math.max(minX, cropState.offsetX));
+  cropState.offsetY = Math.min(0, Math.max(minY, cropState.offsetY));
+}
+function closeCropTool(){
+  cropOverlay.classList.remove('show');
+  cropState = null;
+}
+cropViewport.addEventListener('pointerdown', (e)=>{
+  if(!cropState) return;
+  cropDragging = true;
+  cropViewport.classList.add('dragging');
+  cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+  cropStartOffsetX = cropState.offsetX; cropStartOffsetY = cropState.offsetY;
+  cropViewport.setPointerCapture(e.pointerId);
+});
+cropViewport.addEventListener('pointermove', (e)=>{
+  if(!cropDragging || !cropState) return;
+  cropState.offsetX = cropStartOffsetX + (e.clientX - cropDragStartX);
+  cropState.offsetY = cropStartOffsetY + (e.clientY - cropDragStartY);
+  clampCropOffset();
+  updateCropImgTransform();
+});
+function endCropDrag(){ cropDragging = false; cropViewport.classList.remove('dragging'); }
+cropViewport.addEventListener('pointerup', endCropDrag);
+cropViewport.addEventListener('pointercancel', endCropDrag);
+cropViewport.addEventListener('pointerleave', ()=>{ if(cropDragging) endCropDrag(); });
+cropClose.addEventListener('click', closeCropTool);
+cropCancel.addEventListener('click', closeCropTool);
+cropOverlay.addEventListener('click', (e)=>{ if(e.target === cropOverlay) closeCropTool(); });
+cropApply.addEventListener('click', ()=>{
+  if(!cropState) return;
+  const { scale, offsetX, offsetY, vw, vh, dataUrl, callback } = cropState;
+  const sx = -offsetX / scale, sy = -offsetY / scale, sw = vw / scale, sh = vh / scale;
+  const outW = 640, outH = Math.round(outW * (vh / vw));
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  const srcImg = new Image();
+  srcImg.onload = ()=>{
+    ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, outW, outH);
+    const resultDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+    callback(resultDataUrl);
+    closeCropTool();
+  };
+  srcImg.src = dataUrl;
 });
 
 /* form submit */
@@ -1014,6 +1121,7 @@ form.addEventListener('submit', async (e)=>{
   const languages = document.getElementById('f-lang').value.split(',').map(s=>s.trim()).filter(Boolean);
   const gameType = document.getElementById('f-type-expansion').checked ? 'expansion' : 'base';
   const baseGameName = document.getElementById('f-basegame').value.trim();
+  const standalone = gameType === 'expansion' ? standaloneCheckbox.checked : false;
   const series = document.getElementById('f-series').value.trim();
   const url = document.getElementById('f-url').value.trim();
   const yearRaw = document.getElementById('f-year').value.trim();
@@ -1035,7 +1143,7 @@ form.addEventListener('submit', async (e)=>{
 
   const payload = {
     name, nameEn, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
-    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', series, url, year, difficulty,
+    gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', standalone, series, url, year, difficulty,
     image: pendingImageData || null
   };
 
@@ -1067,7 +1175,9 @@ function buildDetailMeta(g){
     : `<span class="tag-base">主遊戲</span>`;
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
     ? `<span class="detail-meta-note">擴充自「${escapeHtml(g.baseGameName)}」</span>` : '';
-  rows += metaRow('主遊戲／擴充', typeBadge + baseGameNote);
+  const standaloneNote = (g.gameType === 'expansion' && g.standalone)
+    ? `<span class="detail-meta-note">可獨立遊玩，不需要主遊戲</span>` : '';
+  rows += metaRow('主遊戲／擴充', typeBadge + baseGameNote + standaloneNote);
 
   if(g.series){
     rows += metaRow('系列', `<span class="tag-series">${escapeHtml(g.series)}</span>`);
@@ -1557,15 +1667,16 @@ imageManagerList.addEventListener('change', async (e)=>{
   const id = fileInput.dataset.id;
   const g = games.find(x=>x.id===id);
   if(!g) return;
-  try{
-    const dataUrl = await compressImage(file, 560, 0.68);
-    await updateDoc(doc(db, 'games', id), { image: dataUrl });
-    showToast(`已更新「${g.name}」的圖片`);
-    renderImageManagerList();
-  }catch(err){
-    console.error(err);
-    showToast('上傳失敗，請稍後再試');
-  }
+  openCropTool(file, async (dataUrl)=>{
+    try{
+      await updateDoc(doc(db, 'games', id), { image: dataUrl });
+      showToast(`已更新「${g.name}」的圖片`);
+      renderImageManagerList();
+    }catch(err){
+      console.error(err);
+      showToast('上傳失敗，請稍後再試');
+    }
+  });
 });
 
 imageManagerList.addEventListener('click', (e)=>{
@@ -1607,12 +1718,13 @@ function csvEscape(val){
 downloadBtn.addEventListener('click', ()=>{
   listPanel.classList.remove('show');
   if(games.length === 0){ showToast('目前還沒有任何桌遊可以下載'); return; }
-  const headers = ['名稱','別名','類型','所屬主遊戲','系列','發行年份','難度(1-5)','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
+  const headers = ['名稱','別名','類型','所屬主遊戲','可獨立遊玩(是/否)','系列','發行年份','難度(1-5)','桌遊類型(逗號分隔)','語言版本(逗號分隔)','最少人數','最多人數','最少時間(分鐘)','最多時間(分鐘)','網址連結','簡介'];
   const rows = games.map(g => [
     g.name,
     g.nameEn || '',
     g.gameType === 'expansion' ? '擴充' : '主遊戲',
     g.gameType === 'expansion' ? (g.baseGameName||'') : '',
+    g.gameType === 'expansion' ? (g.standalone ? '是' : '否') : '',
     g.series || '',
     g.year || '',
     g.difficulty || '',
@@ -1682,7 +1794,7 @@ importFileInput.addEventListener('change', async (e)=>{
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
   // 依下載清單的欄位順序解析：
-  // 名稱,別名,類型,所屬主遊戲,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 名稱,別名,類型,所屬主遊戲,可獨立遊玩,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
@@ -1690,7 +1802,7 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const [name, nameEn, typeLabel, baseGameName, series, yearStr, difficultyStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
+    const [name, nameEn, typeLabel, baseGameName, standaloneStr, series, yearStr, difficultyStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
     const trimmedName = (name||'').trim();
     const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
     const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
@@ -1698,6 +1810,7 @@ importFileInput.addEventListener('change', async (e)=>{
       skipCount++; continue;
     }
     const gameType = (typeLabel||'').trim() === '擴充' ? 'expansion' : 'base';
+    const standalone = gameType === 'expansion' && (standaloneStr||'').trim() === '是';
     const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
     const yearParsed = parseInt((yearStr||'').trim(), 10);
@@ -1705,7 +1818,7 @@ importFileInput.addEventListener('change', async (e)=>{
     const payload = {
       name: trimmedName, nameEn: (nameEn||'').trim(), genres, languages, desc: (desc||'').trim(),
       minPlayers, maxPlayers, minTime, maxTime,
-      gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '',
+      gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '', standalone,
       series: (series||'').trim(), url: (url||'').trim(), year: isNaN(yearParsed) ? null : yearParsed,
       difficulty: (difficultyParsed >= 1 && difficultyParsed <= 5) ? difficultyParsed : null,
       image: null, createdAt: serverTimestamp()
