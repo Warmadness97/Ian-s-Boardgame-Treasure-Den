@@ -28,6 +28,7 @@ const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 let games = [];
 let photos = [];
 let pendingPhotoImageData = null;
+let editingPhotoId = null;
 let editingId = null;
 let pendingImageData = null;
 let pendingImageFullData = null;
@@ -75,6 +76,7 @@ const galleryEmpty = document.getElementById('gallery-empty');
 const galleryLoading = document.getElementById('gallery-loading');
 const galleryCount = document.getElementById('gallery-count');
 const photoOverlay = document.getElementById('photo-overlay');
+const photoModalTitle = document.getElementById('photo-modal-title');
 const photoForm = document.getElementById('photo-form');
 const photoImgInput = document.getElementById('photo-img-input');
 const photoImgPreview = document.getElementById('photo-img-preview');
@@ -86,6 +88,7 @@ const photoDetailOverlay = document.getElementById('photo-detail-overlay');
 const photoDetailClose = document.getElementById('photo-detail-close');
 const photoDetailImg = document.getElementById('photo-detail-img');
 const photoDetailCaption = document.getElementById('photo-detail-caption');
+const photoDetailDate = document.getElementById('photo-detail-date');
 const recommendContent = document.getElementById('recommend-content');
 const recommendPencil = document.getElementById('recommend-pencil');
 const genreLegendList = document.getElementById('genre-legend-list');
@@ -156,13 +159,10 @@ const bannerRemoveBtn = document.getElementById('banner-remove-btn');
 const bannerFileInput = document.getElementById('banner-file-input');
 const customSubtitleInput = document.getElementById('custom-subtitle');
 const subtitlePencil = document.getElementById('subtitle-pencil');
-const badgePlayers = document.getElementById('badge-players');
-const badgeLang = document.getElementById('badge-lang');
-const badgeGenre = document.getElementById('badge-genre');
-const badgeSeries = document.getElementById('badge-series');
-const badgeYear = document.getElementById('badge-year');
-const badgeDifficulty = document.getElementById('badge-difficulty');
-const badgeType = document.getElementById('badge-type');
+const filterMasterBtn = document.getElementById('filter-master-btn');
+const filterMasterPanel = document.getElementById('filter-master-panel');
+const filterMasterGrid = document.getElementById('filter-master-grid');
+const masterFilterBadge = document.getElementById('master-filter-badge');
 const listToggleBtn = document.getElementById('list-toggle-btn');
 const listPanel = document.getElementById('list-panel');
 
@@ -366,6 +366,12 @@ onSnapshot(photosCol, (snap)=>{
   galleryLoading.textContent = '連線失敗，請確認 firebase-config.js 設定是否正確，或是否已建立 photos 集合的安全規則';
 });
 
+function formatPhotoDate(createdAt){
+  if(!createdAt || !createdAt.seconds) return '';
+  const d = new Date(createdAt.seconds * 1000);
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
+
 function renderPhotoGrid(){
   galleryCount.style.display = photos.length > 0 ? 'block' : 'none';
   galleryCount.innerHTML = `共 <strong>${photos.length}</strong> 張照片`;
@@ -379,12 +385,27 @@ function renderPhotoGrid(){
   galleryGrid.innerHTML = photos.map(p => `
     <div class="photo-card" data-id="${p.id}">
       <img src="${p.image}" alt="${escapeHtml(p.caption||'')}">
-      ${p.caption ? `<div class="photo-card-caption-hint">${escapeHtml(p.caption)}</div>` : ''}
-      ${isOwner ? `<button type="button" class="photo-delete-btn" data-id="${p.id}" title="刪除照片">✕</button>` : ''}
+      <div class="photo-card-overlay">
+        ${p.caption ? `<div class="photo-card-caption-hint">${escapeHtml(p.caption)}</div>` : ''}
+        <div class="photo-card-date">${formatPhotoDate(p.createdAt)}</div>
+      </div>
+      ${isOwner ? `
+      <div class="photo-card-actions">
+        <button type="button" class="photo-edit-btn" data-id="${p.id}" title="編輯照片">${EDIT_ICON}</button>
+        <button type="button" class="photo-delete-btn" data-id="${p.id}" title="刪除照片">✕</button>
+      </div>` : ''}
     </div>`).join('');
 }
 
 galleryGrid.addEventListener('click', (e)=>{
+  const editBtn = e.target.closest('.photo-edit-btn');
+  if(editBtn){
+    e.stopPropagation();
+    if(!isOwner) return;
+    const p = photos.find(x => x.id === editBtn.dataset.id);
+    if(p) openPhotoModal('edit', p);
+    return;
+  }
   const delBtn = e.target.closest('.photo-delete-btn');
   if(delBtn){
     e.stopPropagation();
@@ -402,23 +423,41 @@ galleryGrid.addEventListener('click', (e)=>{
     if(!p) return;
     photoDetailImg.innerHTML = `<img src="${p.image}" alt="">`;
     photoDetailCaption.textContent = p.caption || '（沒有照片說明）';
+    photoDetailDate.textContent = formatPhotoDate(p.createdAt) ? `上傳於 ${formatPhotoDate(p.createdAt)}` : '';
     photoDetailOverlay.classList.add('show');
   }
 });
 photoDetailClose.addEventListener('click', ()=> photoDetailOverlay.classList.remove('show'));
 photoDetailOverlay.addEventListener('click', (e)=>{ if(e.target === photoDetailOverlay) photoDetailOverlay.classList.remove('show'); });
 
-/* photo upload */
+/* photo upload / edit */
+function openPhotoModal(mode, photo){
+  editingPhotoId = mode === 'edit' ? photo.id : null;
+  photoModalTitle.textContent = mode === 'edit' ? '編輯照片' : '上傳活動照片';
+  photoSaveBtn.textContent = mode === 'edit' ? '儲存' : '上傳';
+  photoCaption.value = photo ? (photo.caption || '') : '';
+  pendingPhotoImageData = photo ? (photo.image || null) : null;
+  if(pendingPhotoImageData){
+    photoImgPreview.src = pendingPhotoImageData;
+    photoImgPreview.style.display = 'block';
+    photoImgHint.textContent = '點擊更換圖片';
+  } else {
+    photoImgPreview.style.display = 'none';
+    photoImgHint.textContent = '點擊或拖曳圖片到此處上傳';
+  }
+  photoOverlay.classList.add('show');
+}
 function closePhotoModal(){
   photoOverlay.classList.remove('show');
   photoForm.reset();
   photoImgPreview.style.display = 'none';
   photoImgHint.textContent = '點擊或拖曳圖片到此處上傳';
   pendingPhotoImageData = null;
+  editingPhotoId = null;
 }
 galleryAddBtn.addEventListener('click', ()=>{
   if(!isOwner){ showToast('只有管理者可以上傳照片'); return; }
-  photoOverlay.classList.add('show');
+  openPhotoModal('add');
 });
 photoCancelBtn.addEventListener('click', closePhotoModal);
 photoOverlay.addEventListener('click', (e)=>{ if(e.target === photoOverlay) closePhotoModal(); });
@@ -436,20 +475,31 @@ photoForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   if(!isOwner){ showToast('只有管理者可以上傳照片'); return; }
   if(!pendingPhotoImageData){ showToast('請先選擇一張照片'); return; }
-  photoSaveBtn.disabled = true; photoSaveBtn.textContent = '上傳中…';
+  photoSaveBtn.disabled = true;
+  const savingLabel = editingPhotoId ? '儲存中…' : '上傳中…';
+  photoSaveBtn.textContent = savingLabel;
   try{
-    await addDoc(photosCol, {
-      image: pendingPhotoImageData,
-      caption: photoCaption.value.trim(),
-      createdAt: serverTimestamp()
-    });
-    showToast('已上傳照片');
+    if(editingPhotoId){
+      await updateDoc(doc(db, 'photos', editingPhotoId), {
+        image: pendingPhotoImageData,
+        caption: photoCaption.value.trim()
+      });
+      showToast('已更新照片');
+    } else {
+      await addDoc(photosCol, {
+        image: pendingPhotoImageData,
+        caption: photoCaption.value.trim(),
+        createdAt: serverTimestamp()
+      });
+      showToast('已上傳照片');
+    }
     closePhotoModal();
   }catch(err){
     console.error(err);
-    showToast('上傳失敗，請確認網路連線與 Firebase 設定');
+    showToast('儲存失敗，請確認網路連線與 Firebase 設定');
   }
-  photoSaveBtn.disabled = false; photoSaveBtn.textContent = '上傳';
+  photoSaveBtn.disabled = false;
+  photoSaveBtn.textContent = editingPhotoId ? '儲存' : '上傳';
 });
 
 async function saveTitle(val){
@@ -879,15 +929,9 @@ function setFacetBadge(el, size){
 }
 
 function updateFilterBadge(){
-  setFacetBadge(badgePlayers, selectedPlayers.size);
-  setFacetBadge(badgeLang, selectedLangs.size);
-  setFacetBadge(badgeGenre, selectedGenres.size);
-  setFacetBadge(badgeSeries, selectedSeries.size);
-  setFacetBadge(badgeYear, selectedYears.size);
-  setFacetBadge(badgeDifficulty, selectedDifficulties.size);
-  setFacetBadge(badgeType, selectedTypes.size);
   const count = selectedPlayers.size + selectedLangs.size + selectedTypes.size +
     selectedGenres.size + selectedSeries.size + selectedYears.size + selectedDifficulties.size;
+  setFacetBadge(masterFilterBadge, count);
   resetFiltersBtn.style.display = count > 0 ? 'flex' : 'none';
 }
 
@@ -1465,9 +1509,8 @@ resetFiltersBtn.addEventListener('click', ()=>{
   selectedSeries.clear();
   selectedYears.clear();
   selectedDifficulties.clear();
-  document.querySelectorAll('.facet-panel input[type="checkbox"]').forEach(cb => cb.checked = false);
+  filterMasterGrid.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
   onFilterChanged();
-  document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
 });
 
 /* title editing */
@@ -1576,25 +1619,23 @@ bannerRemoveBtn.addEventListener('click', async ()=>{
   showToast('已移除橫幅圖片');
 });
 
-/* facet & list dropdowns */
-document.querySelectorAll('.facet-dropdown').forEach(dropdown=>{
-  const btn = dropdown.querySelector('.btn-facet');
-  btn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    const wasOpen = dropdown.classList.contains('show');
-    listPanel.classList.remove('show');
-    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
-    if(!wasOpen) dropdown.classList.add('show');
-  });
+/* filter master panel & list dropdown */
+filterMasterBtn.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  listPanel.classList.remove('show');
+  filterMasterBtn.classList.toggle('open');
+  filterMasterPanel.classList.toggle('show');
 });
 listToggleBtn.addEventListener('click', (e)=>{
   e.stopPropagation();
-  document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
+  filterMasterBtn.classList.remove('open');
+  filterMasterPanel.classList.remove('show');
   listPanel.classList.toggle('show');
 });
 document.addEventListener('click', (e)=>{
-  if(!e.target.closest('.facet-dropdown')){
-    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
+  if(!e.target.closest('.filter-master-panel') && !e.target.closest('#filter-master-btn')){
+    filterMasterBtn.classList.remove('open');
+    filterMasterPanel.classList.remove('show');
   }
   if(!e.target.closest('.list-dropdown')){
     listPanel.classList.remove('show');
@@ -1607,11 +1648,9 @@ const FACET_LABELS = {
   series: '系列', year: '發行年份', difficulty: '難度', type: '主遊戲／擴充'
 };
 function applyFacetOrder(){
-  const anchor = resetFiltersBtn;
-  if(!anchor || !anchor.parentNode) return;
   facetOrder.forEach(key=>{
-    const el = document.querySelector(`.facet-dropdown[data-facet="${key}"]`);
-    if(el) anchor.parentNode.insertBefore(el, anchor);
+    const el = document.querySelector(`.filter-master-group[data-facet="${key}"]`);
+    if(el) filterMasterGrid.appendChild(el);
   });
 }
 async function saveFacetOrder(){
