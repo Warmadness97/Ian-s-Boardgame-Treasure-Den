@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=15">
+<link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
 
@@ -179,6 +179,10 @@
     <button class="btn-clear-filters" id="reset-filters-btn" style="display:none;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
       清除篩選
+    </button>
+    <button class="btn-facet-order owner-only" id="facet-order-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      排序篩選
     </button>
   </div>
 
@@ -356,6 +360,19 @@
   </div>
 </div>
 
+<div class="overlay" id="facet-order-overlay">
+  <div class="modal image-manager-modal">
+    <button class="detail-close" id="facet-order-close">✕</button>
+    <h2>管理篩選順序</h2>
+    <p class="image-manager-hint">用上／下按鈕調整篩選按鈕在工具列上的排列順序。</p>
+    <div class="image-manager-list" id="facet-order-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="facet-order-cancel">取消</button>
+      <button type="button" class="btn-primary" id="facet-order-apply">套用</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="daily-pick-manager-overlay">
   <div class="modal image-manager-modal">
     <button class="detail-close" id="daily-pick-manager-close">✕</button>
@@ -384,6 +401,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script type="module" src="app.js?v=15"></script>
+<script type="module" src="app.js?v=16"></script>
 </body>
 </html>

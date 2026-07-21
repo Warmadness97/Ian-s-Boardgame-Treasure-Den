@@ -34,6 +34,8 @@ let genreNotes = {};
 let seriesNotes = {};
 let featuredGameId = null;
 let seriesCovers = {};
+let facetOrder = ['players','lang','genre','series','year','difficulty','type'];
+let facetOrderDraft = [];
 const selectedImageIds = new Set();
 
 const grid = document.getElementById('grid');
@@ -82,6 +84,12 @@ const seriesCoverOverlay = document.getElementById('series-cover-overlay');
 const seriesCoverClose = document.getElementById('series-cover-close');
 const seriesCoverList = document.getElementById('series-cover-list');
 const seriesCoverTitle = document.getElementById('series-cover-title');
+const facetOrderBtn = document.getElementById('facet-order-btn');
+const facetOrderOverlay = document.getElementById('facet-order-overlay');
+const facetOrderClose = document.getElementById('facet-order-close');
+const facetOrderCancel = document.getElementById('facet-order-cancel');
+const facetOrderApply = document.getElementById('facet-order-apply');
+const facetOrderList = document.getElementById('facet-order-list');
 
 const selectedPlayers = new Set();
 const selectedLangs = new Set();
@@ -277,6 +285,11 @@ onSnapshot(siteMetaRef, (snap)=>{
     seriesNotes = data.seriesNotes || {};
     seriesCovers = data.seriesCovers || {};
     featuredGameId = data.featuredGameId || null;
+    const FACET_KEYS = ['players','lang','genre','series','year','difficulty','type'];
+    if(Array.isArray(data.facetOrder) && FACET_KEYS.every(k => data.facetOrder.includes(k)) && data.facetOrder.length === FACET_KEYS.length){
+      facetOrder = data.facetOrder;
+    }
+    applyFacetOrder();
     renderGenreLegend();
     renderSeriesLegend();
     renderDailyPick();
@@ -426,6 +439,20 @@ function updateYearFilterOptions(){
   renderCheckboxGroup(filterYearGroup, [...years].sort((a,b)=>b-a), selectedYears, '尚無年份資料');
 }
 
+const LEGEND_PREVIEW_LIMIT = 6;
+let genreLegendExpanded = false;
+let seriesLegendExpanded = false;
+
+function buildLegendListHtml(itemsHtml, expanded, toggleId){
+  const total = itemsHtml.length;
+  if(total <= LEGEND_PREVIEW_LIMIT){
+    return itemsHtml.join('');
+  }
+  const shown = expanded ? itemsHtml : itemsHtml.slice(0, LEGEND_PREVIEW_LIMIT);
+  const toggleBtn = `<button type="button" class="legend-toggle-btn" id="${toggleId}">${expanded ? '收合 ▲' : `顯示全部（共 ${total} 個）▾`}</button>`;
+  return shown.join('') + toggleBtn;
+}
+
 function renderGenreLegend(){
   const genreCounts = new Map();
   games.forEach(g => (g.genres||[]).forEach(t => genreCounts.set(t, (genreCounts.get(t)||0) + 1)));
@@ -434,7 +461,7 @@ function renderGenreLegend(){
     genreLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何類型標籤 — 新增桌遊時填寫「類型」欄位後，會自動列在這裡。</div>`;
     return;
   }
-  genreLegendList.innerHTML = genres.map(t=>{
+  const itemsHtml = genres.map(t=>{
     const note = (genreNotes[t] || '').trim();
     const noteHtml = note ? escapeHtml(note) : (isOwner ? '點選鉛筆新增說明' : '尚無說明');
     const pencil = isOwner
@@ -449,7 +476,8 @@ function renderGenreLegend(){
       </div>
       <span class="genre-note-text ${note ? '' : 'empty'}">${noteHtml}</span>
     </div>`;
-  }).join('');
+  });
+  genreLegendList.innerHTML = buildLegendListHtml(itemsHtml, genreLegendExpanded, 'genre-legend-toggle');
 }
 
 function renderSeriesLegend(){
@@ -460,7 +488,7 @@ function renderSeriesLegend(){
     seriesLegendList.innerHTML = `<div class="genre-legend-empty">尚未有任何系列 — 新增桌遊時填寫「系列」欄位後，會自動列在這裡。</div>`;
     return;
   }
-  seriesLegendList.innerHTML = seriesNames.map(s=>{
+  const itemsHtml = seriesNames.map(s=>{
     const note = (seriesNotes[s] || '').trim();
     const noteHtml = note ? escapeHtml(note) : (isOwner ? '點選鉛筆新增說明' : '尚無說明');
     const pencil = isOwner
@@ -475,9 +503,16 @@ function renderSeriesLegend(){
       </div>
       <span class="genre-note-text ${note ? '' : 'empty'}">${noteHtml}</span>
     </div>`;
-  }).join('');
+  });
+  seriesLegendList.innerHTML = buildLegendListHtml(itemsHtml, seriesLegendExpanded, 'series-legend-toggle');
 }
 seriesLegendList.addEventListener('click', (e)=>{
+  const toggle = e.target.closest('#series-legend-toggle');
+  if(toggle){
+    seriesLegendExpanded = !seriesLegendExpanded;
+    renderSeriesLegend();
+    return;
+  }
   const pencil = e.target.closest('.series-note-pencil');
   if(pencil){
     if(!isOwner) return;
@@ -595,6 +630,12 @@ dailyPickApplyBtn.addEventListener('click', async ()=>{
 });
 
 genreLegendList.addEventListener('click', (e)=>{
+  const toggle = e.target.closest('#genre-legend-toggle');
+  if(toggle){
+    genreLegendExpanded = !genreLegendExpanded;
+    renderGenreLegend();
+    return;
+  }
   const pencil = e.target.closest('.genre-note-pencil');
   if(pencil){
     if(!isOwner) return;
@@ -652,8 +693,8 @@ function renderCard(g, stackInfo){
     </div>`;
   }
   const expansionTag = g.gameType === 'expansion' ? `<span class="tag-expansion">擴充</span>` : '';
-  const seriesLabel = stackInfo ? `${escapeHtml(g.series)} 系列 · 共 ${stackInfo.count} 款` : (g.series ? `${escapeHtml(g.series)} 系列` : '');
-  const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${seriesLabel}</span>` : '';
+  const seriesTag = g.series ? `<span class="tag-series filter-tag" data-filter="series" data-value="${escapeHtml(g.series)}">${escapeHtml(g.series)} 系列</span>` : '';
+  const stackCountNote = stackInfo ? `<div class="stack-count-note">📚 這個系列共有 ${stackInfo.count} 款作品</div>` : '';
   const baseGameNote = (g.gameType === 'expansion' && g.baseGameName)
     ? `<div class="base-game-note">→ 擴充自「${escapeHtml(g.baseGameName)}」</div>` : '';
   const imgHtml = g.image
@@ -670,6 +711,7 @@ function renderCard(g, stackInfo){
       ${g.nameEn ? `<div class="card-name-en">${escapeHtml(g.nameEn)}</div>` : ''}
       ${g.year ? `<div class="card-year">${CALENDAR_ICON}${g.year}</div>` : ''}
       ${g.difficulty ? `<div class="difficulty-stars">${renderStars(g.difficulty)}</div>` : ''}
+      ${stackCountNote}
       ${genreTags ? `<div class="tags">${genreTags}</div>` : ''}
       ${baseGameNote}
       <div class="card-desc">${escapeHtml(g.desc||'')}</div>
@@ -1282,6 +1324,64 @@ document.addEventListener('click', (e)=>{
   if(!e.target.closest('.list-dropdown')){
     listPanel.classList.remove('show');
   }
+});
+
+/* ---------- Facet order management ---------- */
+const FACET_LABELS = {
+  players: '遊玩人數', lang: '語言版本', genre: '桌遊類型',
+  series: '系列', year: '發行年份', difficulty: '難度', type: '主遊戲／擴充'
+};
+function applyFacetOrder(){
+  const anchor = resetFiltersBtn;
+  if(!anchor || !anchor.parentNode) return;
+  facetOrder.forEach(key=>{
+    const el = document.querySelector(`.facet-dropdown[data-facet="${key}"]`);
+    if(el) anchor.parentNode.insertBefore(el, anchor);
+  });
+}
+async function saveFacetOrder(){
+  try{
+    await setDoc(siteMetaRef, { facetOrder }, { merge: true });
+  }catch(e){
+    showToast('篩選順序儲存失敗，請確認網路連線與 Firebase 設定');
+  }
+}
+function renderFacetOrderList(){
+  facetOrderList.innerHTML = facetOrderDraft.map((key, i)=> `
+    <div class="facet-order-row" data-key="${key}">
+      <div class="facet-order-name">${FACET_LABELS[key] || key}</div>
+      <div class="facet-order-actions">
+        <button type="button" class="facet-order-move-btn" data-dir="up" data-key="${key}" ${i===0?'disabled':''}>↑</button>
+        <button type="button" class="facet-order-move-btn" data-dir="down" data-key="${key}" ${i===facetOrderDraft.length-1?'disabled':''}>↓</button>
+      </div>
+    </div>`).join('');
+}
+facetOrderBtn.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以調整篩選順序'); return; }
+  facetOrderDraft = [...facetOrder];
+  renderFacetOrderList();
+  facetOrderOverlay.classList.add('show');
+});
+facetOrderList.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.facet-order-move-btn');
+  if(!btn || btn.disabled) return;
+  const key = btn.dataset.key;
+  const dir = btn.dataset.dir;
+  const idx = facetOrderDraft.indexOf(key);
+  const swapWith = dir === 'up' ? idx - 1 : idx + 1;
+  if(swapWith < 0 || swapWith >= facetOrderDraft.length) return;
+  [facetOrderDraft[idx], facetOrderDraft[swapWith]] = [facetOrderDraft[swapWith], facetOrderDraft[idx]];
+  renderFacetOrderList();
+});
+facetOrderClose.addEventListener('click', ()=> facetOrderOverlay.classList.remove('show'));
+facetOrderCancel.addEventListener('click', ()=> facetOrderOverlay.classList.remove('show'));
+facetOrderOverlay.addEventListener('click', (e)=>{ if(e.target === facetOrderOverlay) facetOrderOverlay.classList.remove('show'); });
+facetOrderApply.addEventListener('click', async ()=>{
+  facetOrder = [...facetOrderDraft];
+  applyFacetOrder();
+  await saveFacetOrder();
+  facetOrderOverlay.classList.remove('show');
+  showToast('已更新篩選順序');
 });
 
 /* ---------- Series cover picker ---------- */
