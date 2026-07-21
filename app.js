@@ -13,6 +13,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 const gamesCol = collection(db, 'games');
+const photosCol = collection(db, 'photos');
 const siteMetaRef = doc(db, 'meta', 'site');
 
 let currentUser = null;
@@ -25,8 +26,11 @@ const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 
 let games = [];
+let photos = [];
+let pendingPhotoImageData = null;
 let editingId = null;
 let pendingImageData = null;
+let pendingImageFullData = null;
 let titleSyncing = false;
 let currentPage = 1;
 let pageSize = 20;
@@ -48,6 +52,7 @@ const imgInput = document.getElementById('img-input');
 const imgPreview = document.getElementById('img-preview');
 const imgHint = document.getElementById('img-hint');
 const imgRemoveBtn = document.getElementById('img-remove-btn');
+const imgResizeBtn = document.getElementById('img-resize-btn');
 const titleInput = document.getElementById('site-title');
 const filterPlayersGroup = document.getElementById('filter-players-group');
 const filterLangGroup = document.getElementById('filter-lang-group');
@@ -61,6 +66,26 @@ const homeView = document.getElementById('home-view');
 const libraryView = document.getElementById('library-view');
 const enterLibraryBtn = document.getElementById('enter-library-btn');
 const backHomeBtn = document.getElementById('back-home-btn');
+const galleryView = document.getElementById('gallery-view');
+const enterGalleryBtn = document.getElementById('enter-gallery-btn');
+const galleryBackHomeBtn = document.getElementById('gallery-back-home-btn');
+const galleryAddBtn = document.getElementById('gallery-add-btn');
+const galleryGrid = document.getElementById('gallery-grid');
+const galleryEmpty = document.getElementById('gallery-empty');
+const galleryLoading = document.getElementById('gallery-loading');
+const galleryCount = document.getElementById('gallery-count');
+const photoOverlay = document.getElementById('photo-overlay');
+const photoForm = document.getElementById('photo-form');
+const photoImgInput = document.getElementById('photo-img-input');
+const photoImgPreview = document.getElementById('photo-img-preview');
+const photoImgHint = document.getElementById('photo-img-hint');
+const photoCaption = document.getElementById('photo-caption');
+const photoCancelBtn = document.getElementById('photo-cancel-btn');
+const photoSaveBtn = document.getElementById('photo-save-btn');
+const photoDetailOverlay = document.getElementById('photo-detail-overlay');
+const photoDetailClose = document.getElementById('photo-detail-close');
+const photoDetailImg = document.getElementById('photo-detail-img');
+const photoDetailCaption = document.getElementById('photo-detail-caption');
 const recommendContent = document.getElementById('recommend-content');
 const recommendPencil = document.getElementById('recommend-pencil');
 const genreLegendList = document.getElementById('genre-legend-list');
@@ -329,6 +354,102 @@ onSnapshot(gamesCol, (snap)=>{
 }, (err)=>{
   console.error(err);
   loadingEl.textContent = '連線失敗，請確認 firebase-config.js 設定是否正確';
+});
+
+onSnapshot(photosCol, (snap)=>{
+  galleryLoading.style.display = 'none';
+  photos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  renderPhotoGrid();
+}, (err)=>{
+  console.error(err);
+  galleryLoading.textContent = '連線失敗，請確認 firebase-config.js 設定是否正確，或是否已建立 photos 集合的安全規則';
+});
+
+function renderPhotoGrid(){
+  galleryCount.style.display = photos.length > 0 ? 'block' : 'none';
+  galleryCount.innerHTML = `共 <strong>${photos.length}</strong> 張照片`;
+  if(photos.length === 0){
+    galleryGrid.style.display = 'none';
+    galleryEmpty.style.display = 'block';
+    return;
+  }
+  galleryGrid.style.display = 'grid';
+  galleryEmpty.style.display = 'none';
+  galleryGrid.innerHTML = photos.map(p => `
+    <div class="photo-card" data-id="${p.id}">
+      <img src="${p.image}" alt="${escapeHtml(p.caption||'')}">
+      ${p.caption ? `<div class="photo-card-caption-hint">${escapeHtml(p.caption)}</div>` : ''}
+      ${isOwner ? `<button type="button" class="photo-delete-btn" data-id="${p.id}" title="刪除照片">✕</button>` : ''}
+    </div>`).join('');
+}
+
+galleryGrid.addEventListener('click', (e)=>{
+  const delBtn = e.target.closest('.photo-delete-btn');
+  if(delBtn){
+    e.stopPropagation();
+    if(!isOwner) return;
+    const id = delBtn.dataset.id;
+    if(!confirm('確定要刪除這張照片嗎？此動作無法復原。')) return;
+    deleteDoc(doc(db, 'photos', id))
+      .then(()=> showToast('已刪除照片'))
+      .catch(()=> showToast('刪除失敗，請稍後再試'));
+    return;
+  }
+  const card = e.target.closest('.photo-card');
+  if(card){
+    const p = photos.find(x => x.id === card.dataset.id);
+    if(!p) return;
+    photoDetailImg.innerHTML = `<img src="${p.image}" alt="">`;
+    photoDetailCaption.textContent = p.caption || '（沒有照片說明）';
+    photoDetailOverlay.classList.add('show');
+  }
+});
+photoDetailClose.addEventListener('click', ()=> photoDetailOverlay.classList.remove('show'));
+photoDetailOverlay.addEventListener('click', (e)=>{ if(e.target === photoDetailOverlay) photoDetailOverlay.classList.remove('show'); });
+
+/* photo upload */
+function closePhotoModal(){
+  photoOverlay.classList.remove('show');
+  photoForm.reset();
+  photoImgPreview.style.display = 'none';
+  photoImgHint.textContent = '點擊或拖曳圖片到此處上傳';
+  pendingPhotoImageData = null;
+}
+galleryAddBtn.addEventListener('click', ()=>{
+  if(!isOwner){ showToast('只有管理者可以上傳照片'); return; }
+  photoOverlay.classList.add('show');
+});
+photoCancelBtn.addEventListener('click', closePhotoModal);
+photoOverlay.addEventListener('click', (e)=>{ if(e.target === photoOverlay) closePhotoModal(); });
+
+async function handlePhotoImageFile(file){
+  if(!file) return;
+  pendingPhotoImageData = await compressImage(file, 900, 0.78);
+  photoImgPreview.src = pendingPhotoImageData;
+  photoImgPreview.style.display = 'block';
+  photoImgHint.textContent = '點擊更換圖片';
+}
+photoImgInput.addEventListener('change', (e)=> handlePhotoImageFile(e.target.files[0]));
+
+photoForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!isOwner){ showToast('只有管理者可以上傳照片'); return; }
+  if(!pendingPhotoImageData){ showToast('請先選擇一張照片'); return; }
+  photoSaveBtn.disabled = true; photoSaveBtn.textContent = '上傳中…';
+  try{
+    await addDoc(photosCol, {
+      image: pendingPhotoImageData,
+      caption: photoCaption.value.trim(),
+      createdAt: serverTimestamp()
+    });
+    showToast('已上傳照片');
+    closePhotoModal();
+  }catch(err){
+    console.error(err);
+    showToast('上傳失敗，請確認網路連線與 Firebase 設定');
+  }
+  photoSaveBtn.disabled = false; photoSaveBtn.textContent = '上傳';
 });
 
 async function saveTitle(val){
@@ -935,12 +1056,15 @@ function openModal(mode, game){
   document.getElementById('f-mint').value = game ? game.minTime : '';
   document.getElementById('f-maxt').value = game ? game.maxTime : '';
   pendingImageData = game ? (game.image || null) : null;
+  pendingImageFullData = game ? (game.imageFull || game.image || null) : null;
   if(pendingImageData){
     imgPreview.src = pendingImageData; imgPreview.style.display='block'; imgHint.textContent='點擊更換圖片';
     imgRemoveBtn.style.display = 'inline-block';
+    imgResizeBtn.style.display = 'inline-block';
   } else {
     imgPreview.style.display='none'; imgHint.textContent='點擊或拖曳圖片到此處上傳';
     imgRemoveBtn.style.display = 'none';
+    imgResizeBtn.style.display = 'none';
   }
   overlay.classList.add('show');
 }
@@ -950,7 +1074,9 @@ function closeModal(){
   imgPreview.style.display='none';
   imgHint.textContent='點擊或拖曳圖片到此處上傳';
   imgRemoveBtn.style.display = 'none';
+  imgResizeBtn.style.display = 'none';
   pendingImageData = null;
+  pendingImageFullData = null;
   editingId = null;
   baseGameField.style.display = 'none';
   setDifficultyInputValue(0);
@@ -994,12 +1120,14 @@ function compressImage(file, maxDim, quality){
 
 async function handleImageFile(file){
   if(!file) return;
-  openCropTool(file, (dataUrl)=>{
-    pendingImageData = dataUrl;
+  openCropTool(file, (thumbUrl, fullUrl)=>{
+    pendingImageData = thumbUrl;
+    pendingImageFullData = fullUrl;
     imgPreview.src = pendingImageData;
     imgPreview.style.display = 'block';
     imgHint.textContent = '點擊更換圖片';
     imgRemoveBtn.style.display = 'inline-block';
+    imgResizeBtn.style.display = 'inline-block';
   });
 }
 imgInput.addEventListener('change', (e)=> handleImageFile(e.target.files[0]));
@@ -1008,11 +1136,22 @@ imgRemoveBtn.addEventListener('click', ()=>{
   if(!pendingImageData) return;
   if(!confirm('確定要移除這張圖片嗎？')) return;
   pendingImageData = null;
+  pendingImageFullData = null;
   imgInput.value = '';
   imgPreview.src = '';
   imgPreview.style.display = 'none';
   imgHint.textContent = '點擊或拖曳圖片到此處上傳';
   imgRemoveBtn.style.display = 'none';
+  imgResizeBtn.style.display = 'none';
+});
+
+imgResizeBtn.addEventListener('click', ()=>{
+  if(!pendingImageFullData && !pendingImageData) return;
+  openCropTool(pendingImageFullData || pendingImageData, (thumbUrl, fullUrl)=>{
+    pendingImageData = thumbUrl;
+    pendingImageFullData = fullUrl;
+    imgPreview.src = pendingImageData;
+  });
 });
 
 /* ---------- Image crop / reposition tool ---------- */
@@ -1022,38 +1161,43 @@ const cropCancel = document.getElementById('crop-cancel');
 const cropApply = document.getElementById('crop-apply');
 const cropViewport = document.getElementById('crop-viewport');
 const cropImg = document.getElementById('crop-img');
+const FULL_IMAGE_MAX_DIM = 1400;
 let cropState = null;
 let cropDragging = false;
 let cropDragStartX = 0, cropDragStartY = 0, cropStartOffsetX = 0, cropStartOffsetY = 0;
 
-function openCropTool(file, callback){
-  const reader = new FileReader();
-  reader.onload = (e)=>{
-    const dataUrl = e.target.result;
-    const img = new Image();
-    img.onload = ()=>{
-      cropOverlay.classList.add('show');
-      requestAnimationFrame(()=>{
-        const vw = cropViewport.clientWidth;
-        const vh = cropViewport.clientHeight;
-        const scale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
-        const dispW = img.naturalWidth * scale;
-        const dispH = img.naturalHeight * scale;
-        cropState = {
-          naturalW: img.naturalWidth, naturalH: img.naturalHeight,
-          scale, vw, vh, dispW, dispH,
-          offsetX: (vw - dispW) / 2, offsetY: (vh - dispH) / 2,
-          dataUrl, callback
-        };
-        cropImg.src = dataUrl;
-        cropImg.style.width = dispW + 'px';
-        cropImg.style.height = dispH + 'px';
-        updateCropImgTransform();
-      });
-    };
-    img.src = dataUrl;
+function openCropTool(fileOrDataUrl, callback){
+  if(typeof fileOrDataUrl === 'string'){
+    loadCropSource(fileOrDataUrl, callback);
+  } else {
+    const reader = new FileReader();
+    reader.onload = (e)=> loadCropSource(e.target.result, callback);
+    reader.readAsDataURL(fileOrDataUrl);
+  }
+}
+function loadCropSource(dataUrl, callback){
+  const img = new Image();
+  img.onload = ()=>{
+    cropOverlay.classList.add('show');
+    requestAnimationFrame(()=>{
+      const vw = cropViewport.clientWidth;
+      const vh = cropViewport.clientHeight;
+      const scale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
+      const dispW = img.naturalWidth * scale;
+      const dispH = img.naturalHeight * scale;
+      cropState = {
+        naturalW: img.naturalWidth, naturalH: img.naturalHeight,
+        scale, vw, vh, dispW, dispH,
+        offsetX: (vw - dispW) / 2, offsetY: (vh - dispH) / 2,
+        dataUrl, callback
+      };
+      cropImg.src = dataUrl;
+      cropImg.style.width = dispW + 'px';
+      cropImg.style.height = dispH + 'px';
+      updateCropImgTransform();
+    });
   };
-  reader.readAsDataURL(file);
+  img.src = dataUrl;
 }
 function updateCropImgTransform(){
   cropImg.style.transform = `translate(${cropState.offsetX}px, ${cropState.offsetY}px)`;
@@ -1092,17 +1236,27 @@ cropCancel.addEventListener('click', closeCropTool);
 cropOverlay.addEventListener('click', (e)=>{ if(e.target === cropOverlay) closeCropTool(); });
 cropApply.addEventListener('click', ()=>{
   if(!cropState) return;
-  const { scale, offsetX, offsetY, vw, vh, dataUrl, callback } = cropState;
+  const { naturalW, naturalH, scale, offsetX, offsetY, vw, vh, dataUrl, callback } = cropState;
   const sx = -offsetX / scale, sy = -offsetY / scale, sw = vw / scale, sh = vh / scale;
   const outW = 640, outH = Math.round(outW * (vh / vw));
-  const canvas = document.createElement('canvas');
-  canvas.width = outW; canvas.height = outH;
-  const ctx = canvas.getContext('2d');
   const srcImg = new Image();
   srcImg.onload = ()=>{
-    ctx.drawImage(srcImg, sx, sy, sw, sh, 0, 0, outW, outH);
-    const resultDataUrl = canvas.toDataURL('image/jpeg', 0.75);
-    callback(resultDataUrl);
+    // 縮圖：依選取範圍裁切
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = outW; thumbCanvas.height = outH;
+    thumbCanvas.getContext('2d').drawImage(srcImg, sx, sy, sw, sh, 0, 0, outW, outH);
+    const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.75);
+
+    // 完整大小版本：不裁切，只縮放到安全範圍內，供放大檢視使用
+    let fw = naturalW, fh = naturalH;
+    if(fw > fh && fw > FULL_IMAGE_MAX_DIM){ fh = Math.round(fh * FULL_IMAGE_MAX_DIM / fw); fw = FULL_IMAGE_MAX_DIM; }
+    else if(fh > FULL_IMAGE_MAX_DIM){ fw = Math.round(fw * FULL_IMAGE_MAX_DIM / fh); fh = FULL_IMAGE_MAX_DIM; }
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = fw; fullCanvas.height = fh;
+    fullCanvas.getContext('2d').drawImage(srcImg, 0, 0, fw, fh);
+    const fullDataUrl = fullCanvas.toDataURL('image/jpeg', 0.82);
+
+    callback(thumbDataUrl, fullDataUrl);
     closeCropTool();
   };
   srcImg.src = dataUrl;
@@ -1144,7 +1298,7 @@ form.addEventListener('submit', async (e)=>{
   const payload = {
     name, nameEn, genres, languages, desc, minPlayers, maxPlayers, minTime, maxTime,
     gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', standalone, series, url, year, difficulty,
-    image: pendingImageData || null
+    image: pendingImageData || null, imageFull: pendingImageFullData || null
   };
 
   try{
@@ -1195,8 +1349,9 @@ function openDetailModal(g){
   const players = g.minPlayers === g.maxPlayers ? `${g.minPlayers} 人` : `${g.minPlayers}–${g.maxPlayers} 人`;
   const time = g.minTime === g.maxTime ? `${g.minTime} 分鐘` : `${g.minTime}–${g.maxTime} 分鐘`;
 
-  detailImg.innerHTML = g.image
-    ? `<img src="${g.image}" alt="${escapeHtml(g.name)}">`
+  const fullImg = g.imageFull || g.image;
+  detailImg.innerHTML = fullImg
+    ? `<img src="${fullImg}" alt="${escapeHtml(g.name)}">`
     : `<div class="placeholder">尚未上傳圖片</div>`;
   detailName.textContent = g.name;
   detailNameEn.textContent = g.nameEn || '';
@@ -1366,6 +1521,16 @@ enterLibraryBtn.addEventListener('click', ()=>{
 });
 backHomeBtn.addEventListener('click', ()=>{
   libraryView.style.display = 'none';
+  homeView.style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+enterGalleryBtn.addEventListener('click', ()=>{
+  homeView.style.display = 'none';
+  galleryView.style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+galleryBackHomeBtn.addEventListener('click', ()=>{
+  galleryView.style.display = 'none';
   homeView.style.display = 'block';
   window.scrollTo({top:0, behavior:'smooth'});
 });
@@ -1546,6 +1711,7 @@ function renderImageManagerList(){
       <div class="image-manager-actions">
         <button type="button" class="img-upload-btn" data-id="${g.id}">上傳</button>
         <input type="file" accept="image/*" class="img-manager-file-input" data-id="${g.id}" style="display:none;">
+        <button type="button" class="img-resize-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>調整大小</button>
         <button type="button" class="img-download-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>下載</button>
         <button type="button" class="img-remove-row-btn" data-id="${g.id}" ${g.image ? '' : 'disabled'}>移除</button>
       </div>
@@ -1586,7 +1752,7 @@ async function downloadSelectedImages(){
   const usedNames = new Set();
   ids.forEach(id=>{
     const g = games.find(x => x.id === id);
-    const base64Data = g.image.split(',')[1];
+    const base64Data = (g.imageFull || g.image).split(',')[1];
     const safeBase = (g.name || id).replace(/[\\/:*?"<>|]/g, '_').trim() || id;
     let finalName = `${safeBase}.jpg`;
     let n = 2;
@@ -1667,9 +1833,9 @@ imageManagerList.addEventListener('change', async (e)=>{
   const id = fileInput.dataset.id;
   const g = games.find(x=>x.id===id);
   if(!g) return;
-  openCropTool(file, async (dataUrl)=>{
+  openCropTool(file, async (thumbUrl, fullUrl)=>{
     try{
-      await updateDoc(doc(db, 'games', id), { image: dataUrl });
+      await updateDoc(doc(db, 'games', id), { image: thumbUrl, imageFull: fullUrl });
       showToast(`已更新「${g.name}」的圖片`);
       renderImageManagerList();
     }catch(err){
@@ -1686,12 +1852,29 @@ imageManagerList.addEventListener('click', (e)=>{
     fileInput.click();
     return;
   }
+  const resizeBtn = e.target.closest('.img-resize-row-btn');
+  if(resizeBtn && !resizeBtn.disabled){
+    const id = resizeBtn.dataset.id;
+    const g = games.find(x=>x.id===id);
+    if(!g || !g.image) return;
+    openCropTool(g.imageFull || g.image, async (thumbUrl, fullUrl)=>{
+      try{
+        await updateDoc(doc(db, 'games', id), { image: thumbUrl, imageFull: fullUrl });
+        showToast(`已調整「${g.name}」的圖片大小`);
+        renderImageManagerList();
+      }catch(err){
+        console.error(err);
+        showToast('調整失敗，請稍後再試');
+      }
+    });
+    return;
+  }
   const downloadRowBtn = e.target.closest('.img-download-row-btn');
   if(downloadRowBtn && !downloadRowBtn.disabled){
     const id = downloadRowBtn.dataset.id;
     const g = games.find(x=>x.id===id);
     if(!g || !g.image) return;
-    downloadDataUrl(g.image, `${(g.name||'game').replace(/[\\/:*?"<>|]/g,'_')}.jpg`);
+    downloadDataUrl(g.imageFull || g.image, `${(g.name||'game').replace(/[\\/:*?"<>|]/g,'_')}.jpg`);
     return;
   }
   const removeBtn = e.target.closest('.img-remove-row-btn');
@@ -1700,7 +1883,7 @@ imageManagerList.addEventListener('click', (e)=>{
     const g = games.find(x=>x.id===id);
     if(!g) return;
     if(!confirm(`確定要移除「${g.name}」的圖片嗎？`)) return;
-    updateDoc(doc(db, 'games', id), { image: null })
+    updateDoc(doc(db, 'games', id), { image: null, imageFull: null })
       .then(()=>{
         showToast('已移除圖片');
         renderImageManagerList();
