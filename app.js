@@ -403,10 +403,7 @@ function renderPhotoGrid(){
   galleryGrid.innerHTML = sorted.map(p => `
     <div class="photo-card" data-id="${p.id}">
       <img src="${p.image}" alt="${escapeHtml(p.caption||'')}">
-      <div class="photo-card-overlay">
-        ${p.caption ? `<div class="photo-card-caption-hint">${escapeHtml(p.caption)}</div>` : ''}
-        <div class="photo-card-date">${formatPhotoDate(p.createdAt)}</div>
-      </div>
+      ${p.caption ? `<div class="photo-card-overlay"><div class="photo-card-caption-hint">${escapeHtml(p.caption)}</div></div>` : ''}
       ${isOwner ? `
       <div class="photo-card-actions">
         <button type="button" class="photo-edit-btn" data-id="${p.id}" title="編輯照片">${EDIT_ICON}</button>
@@ -443,7 +440,6 @@ galleryGrid.addEventListener('click', (e)=>{
     if(!p) return;
     photoDetailImg.innerHTML = `<img src="${p.image}" alt="">`;
     photoDetailCaption.textContent = p.caption || '（沒有照片說明）';
-    photoDetailDate.textContent = formatPhotoDate(p.createdAt) ? `上傳於 ${formatPhotoDate(p.createdAt)}` : '';
     photoDetailOverlay.classList.add('show');
   }
 });
