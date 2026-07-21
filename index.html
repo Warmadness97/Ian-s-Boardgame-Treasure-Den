@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=21">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -294,7 +294,8 @@
       </div>
       <div class="field">
         <label>類型（以逗號分隔）</label>
-        <input type="text" id="f-genre" placeholder="策略, 派對, 合作">
+        <input type="text" id="f-genre" list="genre-list" placeholder="策略, 派對, 合作">
+        <datalist id="genre-list"></datalist>
       </div>
       <div class="field">
         <label>語言版本（以逗號分隔）</label>
@@ -317,7 +318,8 @@
       </div>
       <div class="field">
         <label>系列（選填，例如：卡卡頌系列）</label>
-        <input type="text" id="f-series" placeholder="若不屬於特定系列可留空">
+        <input type="text" id="f-series" list="series-list" placeholder="若不屬於特定系列可留空">
+        <datalist id="series-list"></datalist>
       </div>
       <div class="field">
         <label>網址連結（選填，例如 BGG 頁面或購買連結）</label>
@@ -495,6 +497,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=22"></script>
 </body>
 </html>

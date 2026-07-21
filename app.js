@@ -132,6 +132,8 @@ const resetFiltersBtn = document.getElementById('reset-filters-btn');
 const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
 const baseGameList = document.getElementById('base-game-list');
+const genreDatalist = document.getElementById('genre-list');
+const seriesDatalist = document.getElementById('series-list');
 const baseGameField = document.getElementById('base-game-field');
 const standaloneCheckbox = document.getElementById('f-standalone');
 const difficultyInputEl = document.getElementById('f-difficulty');
@@ -352,6 +354,8 @@ onSnapshot(gamesCol, (snap)=>{
     .sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
   updateLangFilterOptions();
   updateBaseGameOptions();
+  updateGenreDatalist();
+  updateSeriesDatalist();
   updateGenreFilterOptions();
   updateSeriesFilterOptions();
   updateYearFilterOptions();
@@ -607,6 +611,20 @@ function updateBaseGameOptions(){
   const baseNames = games.filter(g => g.gameType !== 'expansion').map(g => g.name);
   baseGameList.innerHTML = [...new Set(baseNames)].sort()
     .map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+}
+
+function updateGenreDatalist(){
+  const genreSet = new Set();
+  games.forEach(g => (g.genres||[]).forEach(t => genreSet.add(t)));
+  genreDatalist.innerHTML = [...genreSet].sort()
+    .map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
+}
+
+function updateSeriesDatalist(){
+  const seriesSet = new Set();
+  games.forEach(g => { if(g.series) seriesSet.add(g.series); });
+  seriesDatalist.innerHTML = [...seriesSet].sort()
+    .map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
 }
 
 function updateGenreFilterOptions(){
@@ -1504,7 +1522,14 @@ function onFilterChanged(){
   currentPage = 1;
   renderGrid();
 }
-document.getElementById('search-input').addEventListener('input', onFilterChanged);
+function debounce(fn, delay){
+  let timer = null;
+  return (...args)=>{
+    clearTimeout(timer);
+    timer = setTimeout(()=> fn(...args), delay);
+  };
+}
+document.getElementById('search-input').addEventListener('input', debounce(onFilterChanged, 300));
 sortSelect.addEventListener('change', onFilterChanged);
 
 function wireCheckboxGroup(container, targetSet){
