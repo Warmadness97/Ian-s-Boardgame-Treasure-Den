@@ -75,6 +75,7 @@ const galleryGrid = document.getElementById('gallery-grid');
 const galleryEmpty = document.getElementById('gallery-empty');
 const galleryLoading = document.getElementById('gallery-loading');
 const galleryCount = document.getElementById('gallery-count');
+const gallerySortSelect = document.getElementById('gallery-sort-select');
 const photoOverlay = document.getElementById('photo-overlay');
 const photoModalTitle = document.getElementById('photo-modal-title');
 const photoForm = document.getElementById('photo-form');
@@ -163,6 +164,13 @@ const filterMasterBtn = document.getElementById('filter-master-btn');
 const filterMasterPanel = document.getElementById('filter-master-panel');
 const filterMasterGrid = document.getElementById('filter-master-grid');
 const masterFilterBadge = document.getElementById('master-filter-badge');
+const badgePlayers = document.getElementById('badge-players');
+const badgeLang = document.getElementById('badge-lang');
+const badgeGenre = document.getElementById('badge-genre');
+const badgeSeries = document.getElementById('badge-series');
+const badgeYear = document.getElementById('badge-year');
+const badgeDifficulty = document.getElementById('badge-difficulty');
+const badgeType = document.getElementById('badge-type');
 const listToggleBtn = document.getElementById('list-toggle-btn');
 const listPanel = document.getElementById('list-panel');
 
@@ -382,7 +390,13 @@ function renderPhotoGrid(){
   }
   galleryGrid.style.display = 'grid';
   galleryEmpty.style.display = 'none';
-  galleryGrid.innerHTML = photos.map(p => `
+  const sortMode = gallerySortSelect.value;
+  const sorted = [...photos].sort((a,b)=>{
+    const at = (a.createdAt && a.createdAt.seconds) || 0;
+    const bt = (b.createdAt && b.createdAt.seconds) || 0;
+    return sortMode === 'oldest' ? at - bt : bt - at;
+  });
+  galleryGrid.innerHTML = sorted.map(p => `
     <div class="photo-card" data-id="${p.id}">
       <img src="${p.image}" alt="${escapeHtml(p.caption||'')}">
       <div class="photo-card-overlay">
@@ -396,6 +410,8 @@ function renderPhotoGrid(){
       </div>` : ''}
     </div>`).join('');
 }
+
+gallerySortSelect.addEventListener('change', renderPhotoGrid);
 
 galleryGrid.addEventListener('click', (e)=>{
   const editBtn = e.target.closest('.photo-edit-btn');
@@ -929,6 +945,13 @@ function setFacetBadge(el, size){
 }
 
 function updateFilterBadge(){
+  setFacetBadge(badgePlayers, selectedPlayers.size);
+  setFacetBadge(badgeLang, selectedLangs.size);
+  setFacetBadge(badgeGenre, selectedGenres.size);
+  setFacetBadge(badgeSeries, selectedSeries.size);
+  setFacetBadge(badgeYear, selectedYears.size);
+  setFacetBadge(badgeDifficulty, selectedDifficulties.size);
+  setFacetBadge(badgeType, selectedTypes.size);
   const count = selectedPlayers.size + selectedLangs.size + selectedTypes.size +
     selectedGenres.size + selectedSeries.size + selectedYears.size + selectedDifficulties.size;
   setFacetBadge(masterFilterBadge, count);
@@ -1510,6 +1533,7 @@ resetFiltersBtn.addEventListener('click', ()=>{
   selectedYears.clear();
   selectedDifficulties.clear();
   filterMasterGrid.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
   onFilterChanged();
 });
 
@@ -1632,7 +1656,19 @@ listToggleBtn.addEventListener('click', (e)=>{
   filterMasterPanel.classList.remove('show');
   listPanel.classList.toggle('show');
 });
+document.querySelectorAll('.facet-dropdown').forEach(dropdown=>{
+  const btn = dropdown.querySelector('.btn-facet');
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const wasOpen = dropdown.classList.contains('show');
+    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
+    if(!wasOpen) dropdown.classList.add('show');
+  });
+});
 document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.facet-dropdown')){
+    document.querySelectorAll('.facet-dropdown.show').forEach(d => d.classList.remove('show'));
+  }
   if(!e.target.closest('.filter-master-panel') && !e.target.closest('#filter-master-btn')){
     filterMasterBtn.classList.remove('open');
     filterMasterPanel.classList.remove('show');
@@ -1649,7 +1685,7 @@ const FACET_LABELS = {
 };
 function applyFacetOrder(){
   facetOrder.forEach(key=>{
-    const el = document.querySelector(`.filter-master-group[data-facet="${key}"]`);
+    const el = document.querySelector(`.facet-dropdown[data-facet="${key}"]`);
     if(el) filterMasterGrid.appendChild(el);
   });
 }
