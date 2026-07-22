@@ -2092,8 +2092,12 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const trimmedName = col(r, '名稱');
-    const nameEn = col(r, '別名', '英文名稱');
+    let trimmedName = col(r, '名稱');
+    let nameEn = col(r, '別名', '英文名稱');
+    if(!trimmedName && nameEn){
+      trimmedName = nameEn;
+      nameEn = '';
+    }
     const typeLabel = col(r, '類型');
     const baseGameName = col(r, '所屬主遊戲');
     const standaloneStr = col(r, '可獨立遊玩(是/否)', '可獨立遊玩');
