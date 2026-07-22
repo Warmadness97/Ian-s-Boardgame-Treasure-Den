@@ -665,6 +665,12 @@ body.is-logged-in .user-chip{display:flex;}
   margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);
 }
 .image-manager-batch-actions{display:flex;gap:8px;}
+.batch-delete-series-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#batch-delete-series-select{
+  padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);background:#fff;
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink);cursor:pointer;max-width:180px;
+}
+#batch-delete-series-select:focus{outline:none;border-color:var(--accent-mustard);}
 .img-batch-btn{
   padding:8px 14px;border-radius:8px;font-size:12.5px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;
   border:1.5px solid var(--line);background:#fff;color:var(--ink);

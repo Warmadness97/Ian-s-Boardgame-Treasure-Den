@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 
@@ -467,6 +467,12 @@
     <p class="image-manager-hint">勾選要刪除的桌遊，此動作無法復原，請小心操作。</p>
     <div class="image-manager-toolbar">
       <label class="checkbox-option"><input type="checkbox" id="batch-delete-select-all"> 全選</label>
+      <div class="batch-delete-series-picker">
+        <select id="batch-delete-series-select">
+          <option value="">依系列快速勾選…</option>
+        </select>
+        <button type="button" class="img-batch-btn" id="batch-delete-series-btn">勾選此系列</button>
+      </div>
       <div class="image-manager-batch-actions">
         <button type="button" class="img-batch-btn danger" id="batch-delete-confirm" disabled>刪除已選取</button>
       </div>
@@ -516,6 +522,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script type="module" src="app.js?v=26"></script>
+<script type="module" src="app.js?v=27"></script>
 </body>
 </html>

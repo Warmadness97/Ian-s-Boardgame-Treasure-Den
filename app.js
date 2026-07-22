@@ -109,6 +109,8 @@ const batchDeleteOverlay = document.getElementById('batch-delete-overlay');
 const batchDeleteClose = document.getElementById('batch-delete-close');
 const batchDeleteList = document.getElementById('batch-delete-list');
 const batchDeleteSelectAll = document.getElementById('batch-delete-select-all');
+const batchDeleteSeriesSelect = document.getElementById('batch-delete-series-select');
+const batchDeleteSeriesBtn = document.getElementById('batch-delete-series-btn');
 const batchDeleteConfirmBtn = document.getElementById('batch-delete-confirm');
 const seriesLegendList = document.getElementById('series-legend-list');
 const dailyPickManagerOverlay = document.getElementById('daily-pick-manager-overlay');
@@ -1997,6 +1999,13 @@ imageManagerList.addEventListener('click', (e)=>{
 
 /* ---------- Batch delete games ---------- */
 function renderBatchDeleteList(){
+  const seriesSet = new Set();
+  games.forEach(g => { if(g.series) seriesSet.add(g.series); });
+  const currentSeries = batchDeleteSeriesSelect.value;
+  batchDeleteSeriesSelect.innerHTML = '<option value="">依系列快速勾選…</option>' +
+    [...seriesSet].sort().map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if([...seriesSet].includes(currentSeries)) batchDeleteSeriesSelect.value = currentSeries;
+
   if(games.length === 0){
     batchDeleteList.innerHTML = `<div class="genre-legend-empty">目前還沒有任何桌遊。</div>`;
     updateBatchDeleteUI();
@@ -2014,6 +2023,15 @@ function renderBatchDeleteList(){
   updateBatchDeleteUI();
 }
 
+batchDeleteSeriesBtn.addEventListener('click', ()=>{
+  const series = batchDeleteSeriesSelect.value;
+  if(!series){ showToast('請先選擇一個系列'); return; }
+  const matched = games.filter(g => g.series === series);
+  matched.forEach(g => selectedDeleteIds.add(g.id));
+  renderBatchDeleteList();
+  showToast(`已勾選「${series}」系列共 ${matched.length} 款`);
+});
+
 function updateBatchDeleteUI(){
   const rowIds = games.map(g => g.id);
   [...selectedDeleteIds].forEach(id => { if(!rowIds.includes(id)) selectedDeleteIds.delete(id); });
@@ -2027,6 +2045,7 @@ batchDeleteBtn.addEventListener('click', ()=>{
   listPanel.classList.remove('show');
   if(!isOwner){ showToast('只有管理者可以批次刪除桌遊'); return; }
   selectedDeleteIds.clear();
+  batchDeleteSeriesSelect.value = '';
   renderBatchDeleteList();
   batchDeleteOverlay.classList.add('show');
 });
