@@ -2068,12 +2068,23 @@ importFileInput.addEventListener('change', async (e)=>{
   if(!file) return;
   if(!isOwner){ showToast('只有管理者可以匯入清單'); return; }
 
-  const text = await file.text();
+  let text = await file.text();
+  text = text.replace(/^\uFEFF/, '');
   const rows = parseCSV(text);
   if(rows.length < 2){ showToast('檔案內容是空的，或格式不正確'); return; }
 
-  // 依下載清單的欄位順序解析：
-  // 名稱,別名,類型,所屬主遊戲,可獨立遊玩,系列,發行年份,難度,桌遊類型,語言版本,最少人數,最多人數,最少時間,最多時間,網址連結,簡介
+  // 依欄位名稱對應資料，不依賴固定欄位順序或數量，
+  // 這樣即使欄位順序不同、或缺少某一欄（例如舊版匯出檔沒有「可獨立遊玩」欄），也能正常匯入
+  const headerRow = rows[0].map(h => (h||'').replace(/^\uFEFF/, '').trim());
+  const colIndex = {};
+  headerRow.forEach((h, i) => { if(colIndex[h] === undefined) colIndex[h] = i; });
+  function col(row, ...names){
+    for(const n of names){
+      if(colIndex[n] !== undefined) return (row[colIndex[n]] || '').trim();
+    }
+    return '';
+  }
+
   const dataRows = rows.slice(1);
   let successCount = 0, skipCount = 0;
   importBtn.disabled = true;
@@ -2081,24 +2092,39 @@ importFileInput.addEventListener('change', async (e)=>{
   importBtn.innerHTML = '匯入中…';
 
   for(const r of dataRows){
-    const [name, nameEn, typeLabel, baseGameName, standaloneStr, series, yearStr, difficultyStr, genreStr, langStr, minP, maxP, minT, maxT, url, desc] = r;
-    const trimmedName = (name||'').trim();
+    const trimmedName = col(r, '名稱');
+    const nameEn = col(r, '別名', '英文名稱');
+    const typeLabel = col(r, '類型');
+    const baseGameName = col(r, '所屬主遊戲');
+    const standaloneStr = col(r, '可獨立遊玩(是/否)', '可獨立遊玩');
+    const series = col(r, '系列');
+    const yearStr = col(r, '發行年份');
+    const difficultyStr = col(r, '難度(1-5)', '難度');
+    const genreStr = col(r, '桌遊類型(逗號分隔)', '桌遊類型');
+    const langStr = col(r, '語言版本(逗號分隔)', '語言版本');
+    const minP = col(r, '最少人數');
+    const maxP = col(r, '最多人數');
+    const minT = col(r, '最少時間(分鐘)', '最少時間');
+    const maxT = col(r, '最多時間(分鐘)', '最多時間');
+    const url = col(r, '網址連結');
+    const desc = col(r, '簡介');
+
     const minPlayers = parseInt(minP, 10), maxPlayers = parseInt(maxP, 10);
     const minTime = parseInt(minT, 10), maxTime = parseInt(maxT, 10);
     if(!trimmedName || isNaN(minPlayers) || isNaN(maxPlayers) || isNaN(minTime) || isNaN(maxTime)){
       skipCount++; continue;
     }
-    const gameType = (typeLabel||'').trim() === '擴充' ? 'expansion' : 'base';
-    const standalone = gameType === 'expansion' && (standaloneStr||'').trim() === '是';
-    const genres = (genreStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
-    const languages = (langStr||'').split(/[、,]/).map(s=>s.trim()).filter(Boolean);
-    const yearParsed = parseInt((yearStr||'').trim(), 10);
-    const difficultyParsed = parseInt((difficultyStr||'').trim(), 10);
+    const gameType = typeLabel === '擴充' ? 'expansion' : 'base';
+    const standalone = gameType === 'expansion' && standaloneStr === '是';
+    const genres = genreStr.split(/[、,]/).map(s=>s.trim()).filter(Boolean);
+    const languages = langStr.split(/[、,]/).map(s=>s.trim()).filter(Boolean);
+    const yearParsed = parseInt(yearStr, 10);
+    const difficultyParsed = parseInt(difficultyStr, 10);
     const payload = {
-      name: trimmedName, nameEn: (nameEn||'').trim(), genres, languages, desc: (desc||'').trim(),
+      name: trimmedName, nameEn, genres, languages, desc,
       minPlayers, maxPlayers, minTime, maxTime,
-      gameType, baseGameName: gameType === 'expansion' ? (baseGameName||'').trim() : '', standalone,
-      series: (series||'').trim(), url: (url||'').trim(), year: isNaN(yearParsed) ? null : yearParsed,
+      gameType, baseGameName: gameType === 'expansion' ? baseGameName : '', standalone,
+      series, url, year: isNaN(yearParsed) ? null : yearParsed,
       difficulty: (difficultyParsed >= 1 && difficultyParsed <= 5) ? difficultyParsed : null,
       image: null, createdAt: serverTimestamp()
     };
