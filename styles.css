@@ -677,7 +677,7 @@ body.is-logged-in .user-chip{display:flex;}
   display:flex;align-items:center;gap:12px;
   border:1px solid var(--line);border-radius:10px;padding:9px;
 }
-.img-row-select{flex-shrink:0;cursor:pointer;accent-color:var(--accent-mustard-dark);}
+.img-row-select, .delete-row-select{flex-shrink:0;cursor:pointer;accent-color:var(--accent-mustard-dark);}
 .image-manager-thumb{
   width:52px;height:52px;border-radius:8px;overflow:hidden;flex-shrink:0;
   background:var(--surface-2);display:flex;align-items:center;justify-content:center;

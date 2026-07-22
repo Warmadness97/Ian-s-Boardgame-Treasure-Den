@@ -42,6 +42,7 @@ let seriesCovers = {};
 let facetOrder = ['players','lang','genre','series','year','difficulty','type'];
 let facetOrderDraft = [];
 const selectedImageIds = new Set();
+const selectedDeleteIds = new Set();
 
 const grid = document.getElementById('grid');
 const emptyEl = document.getElementById('empty');
@@ -103,6 +104,12 @@ const imageManagerList = document.getElementById('image-manager-list');
 const imageManagerSelectAll = document.getElementById('image-manager-select-all');
 const imageManagerDownloadSelectedBtn = document.getElementById('image-manager-download-selected');
 const imageManagerRemoveSelectedBtn = document.getElementById('image-manager-remove-selected');
+const batchDeleteBtn = document.getElementById('batch-delete-btn');
+const batchDeleteOverlay = document.getElementById('batch-delete-overlay');
+const batchDeleteClose = document.getElementById('batch-delete-close');
+const batchDeleteList = document.getElementById('batch-delete-list');
+const batchDeleteSelectAll = document.getElementById('batch-delete-select-all');
+const batchDeleteConfirmBtn = document.getElementById('batch-delete-confirm');
 const seriesLegendList = document.getElementById('series-legend-list');
 const dailyPickManagerOverlay = document.getElementById('daily-pick-manager-overlay');
 const dailyPickManagerClose = document.getElementById('daily-pick-manager-close');
@@ -1986,6 +1993,84 @@ imageManagerList.addEventListener('click', (e)=>{
       })
       .catch(()=> showToast('移除失敗，請稍後再試'));
   }
+});
+
+/* ---------- Batch delete games ---------- */
+function renderBatchDeleteList(){
+  if(games.length === 0){
+    batchDeleteList.innerHTML = `<div class="genre-legend-empty">目前還沒有任何桌遊。</div>`;
+    updateBatchDeleteUI();
+    return;
+  }
+  const sorted = [...games].sort((a,b)=> (a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
+  batchDeleteList.innerHTML = sorted.map(g => `
+    <div class="image-manager-row" data-id="${g.id}">
+      <input type="checkbox" class="delete-row-select" data-id="${g.id}" ${selectedDeleteIds.has(g.id) ? 'checked' : ''}>
+      <div class="image-manager-thumb">
+        ${g.image ? `<img src="${g.image}" alt="">` : `<span class="placeholder-icon">無圖片</span>`}
+      </div>
+      <div class="image-manager-name">${escapeHtml(g.name)}${g.gameType === 'expansion' ? '（擴充）' : ''}</div>
+    </div>`).join('');
+  updateBatchDeleteUI();
+}
+
+function updateBatchDeleteUI(){
+  const rowIds = games.map(g => g.id);
+  [...selectedDeleteIds].forEach(id => { if(!rowIds.includes(id)) selectedDeleteIds.delete(id); });
+  const count = selectedDeleteIds.size;
+  batchDeleteConfirmBtn.disabled = count === 0;
+  batchDeleteConfirmBtn.textContent = count > 0 ? `刪除已選取（${count}）` : '刪除已選取';
+  batchDeleteSelectAll.checked = rowIds.length > 0 && rowIds.every(id => selectedDeleteIds.has(id));
+}
+
+batchDeleteBtn.addEventListener('click', ()=>{
+  listPanel.classList.remove('show');
+  if(!isOwner){ showToast('只有管理者可以批次刪除桌遊'); return; }
+  selectedDeleteIds.clear();
+  renderBatchDeleteList();
+  batchDeleteOverlay.classList.add('show');
+});
+batchDeleteClose.addEventListener('click', ()=> batchDeleteOverlay.classList.remove('show'));
+batchDeleteOverlay.addEventListener('click', (e)=>{ if(e.target === batchDeleteOverlay) batchDeleteOverlay.classList.remove('show'); });
+
+batchDeleteSelectAll.addEventListener('change', ()=>{
+  if(batchDeleteSelectAll.checked){
+    games.forEach(g => selectedDeleteIds.add(g.id));
+  } else {
+    selectedDeleteIds.clear();
+  }
+  renderBatchDeleteList();
+});
+
+batchDeleteList.addEventListener('change', (e)=>{
+  const cb = e.target.closest('.delete-row-select');
+  if(!cb) return;
+  const id = cb.dataset.id;
+  if(cb.checked){ selectedDeleteIds.add(id); } else { selectedDeleteIds.delete(id); }
+  updateBatchDeleteUI();
+});
+
+batchDeleteConfirmBtn.addEventListener('click', async ()=>{
+  const ids = [...selectedDeleteIds];
+  if(ids.length === 0) return;
+  const names = ids.map(id => { const g = games.find(x=>x.id===id); return g ? g.name : id; });
+  const preview = names.slice(0, 5).join('、') + (names.length > 5 ? ` 等共 ${names.length} 款` : '');
+  if(!confirm(`確定要刪除以下 ${ids.length} 款桌遊嗎？此動作無法復原：\n${preview}`)) return;
+  batchDeleteConfirmBtn.disabled = true;
+  batchDeleteConfirmBtn.textContent = '刪除中…';
+  let successCount = 0, failCount = 0;
+  for(const id of ids){
+    try{
+      await deleteDoc(doc(db, 'games', id));
+      successCount++;
+    }catch(err){
+      console.error(err);
+      failCount++;
+    }
+  }
+  selectedDeleteIds.clear();
+  showToast(failCount > 0 ? `已刪除 ${successCount} 款，${failCount} 款失敗` : `已刪除 ${successCount} 款桌遊`);
+  renderBatchDeleteList();
 });
 
 /* ---------- Download list as CSV ---------- */
